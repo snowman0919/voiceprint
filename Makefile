@@ -9,7 +9,7 @@ test-wasm:
 lint:
 	pnpm lint
 
-typecheck:
+typecheck: build-wasm
 	pnpm --dir apps/web exec tsc --noEmit
 
 test-web:
