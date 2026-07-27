@@ -55,9 +55,16 @@ export function Recorder() {
   const meter = useRef<number | undefined>(undefined);
   const startedAt = useRef(0);
   const pendingAudio = useRef<AudioBuffer | null>(null);
+  const cancelWorker = useRef<(() => void) | undefined>(undefined);
   const [pendingRange, setPendingRange] = useState<PendingRange>();
 
-  useEffect(() => () => stopTracks(), []);
+  useEffect(
+    () => () => {
+      cancelWorker.current?.();
+      stopTracks();
+    },
+    [],
+  );
 
   function stopTracks() {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -75,6 +82,8 @@ export function Recorder() {
     processing?: InputInfo["processing"],
     droppedFrames = false,
   ) {
+    cancelWorker.current?.();
+    cancelWorker.current = undefined;
     setState("checking");
     setAnalysisStage("input");
     setAnalysis(undefined);
@@ -82,6 +91,11 @@ export function Recorder() {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>(
         (resolve, reject) => {
           const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
+          const cancel = () => {
+            worker.terminate();
+            reject(new DOMException("분석이 취소되었습니다.", "AbortError"));
+          };
+          cancelWorker.current = cancel;
           worker.onmessage = ({ data }) => {
             if (data.type === "stage") {
               setAnalysisStage(data.value as AnalysisStage);
@@ -89,11 +103,13 @@ export function Recorder() {
             }
             if (data.type === "result") {
               worker.terminate();
+              if (cancelWorker.current === cancel) cancelWorker.current = undefined;
               resolve(data);
             }
           };
           worker.onerror = () => {
             worker.terminate();
+            if (cancelWorker.current === cancel) cancelWorker.current = undefined;
             reject(new Error("품질 검사를 시작할 수 없습니다."));
           };
           worker.postMessage({ pcm: pcm.buffer, sampleRate, droppedFrames }, [pcm.buffer]);
@@ -106,7 +122,8 @@ export function Recorder() {
       setMessage(result.quality.issues[0]);
       setAnalysisStage(undefined);
       setState("ready");
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
       setAnalysisStage(undefined);
       setState("error");
@@ -154,6 +171,8 @@ export function Recorder() {
   }
 
   async function startRecording() {
+    cancelWorker.current?.();
+    cancelWorker.current = undefined;
     setPendingRange(undefined);
     pendingAudio.current = null;
     setMessage(undefined);
@@ -242,6 +261,14 @@ export function Recorder() {
 
   function stopRecording() {
     recorder.current?.stop();
+  }
+
+  function cancelAnalysis() {
+    cancelWorker.current?.();
+    cancelWorker.current = undefined;
+    setAnalysisStage(undefined);
+    setMessage("분석을 취소했습니다.");
+    setState("idle");
   }
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -364,7 +391,12 @@ export function Recorder() {
         </section>
       )}
       {state === "checking" && (
-        <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>
+        <div>
+          <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>
+          <button onClick={cancelAnalysis} type="button">
+            분석 취소
+          </button>
+        </div>
       )}
       {message && (
         <p className={quality?.issues.length ? "warning" : "error"} role="status">
