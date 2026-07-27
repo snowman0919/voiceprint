@@ -35,3 +35,9 @@ For a waveform dataset, the audit records SHA-256 per audio file, duplicate-cont
 ## Label limitation
 
 Any `male`/`female` speaker label is not a perceived voice-impression label. It must never be presented as actual sex, gender identity, or a probability of either. A validated perceived-impression model needs separately licensed multi-rater data.
+
+## Investigated but not approved
+
+### LibriTTS-VI
+
+The official [Sony LibriTTS-VI repository](https://github.com/sony/LibriTTS-VI) publishes 130 utterances with four professional raters across ten subjective voice-impression scales, plus estimated 11-dimensional values for LibriTTS-R. This is a promising source for a future, more specific impression model. However, its repository has no declared license, and the underlying LibriTTS-R audio has separate provenance and terms. Therefore it has not been downloaded or used for training. Estimated labels also must not be presented as equivalent to the 130 manually rated examples.
