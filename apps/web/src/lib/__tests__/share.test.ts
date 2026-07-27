@@ -13,12 +13,19 @@ const result: SharedResultV1 = {
 
 describe("shared result codec", () => {
   it("round-trips only approved summary data, never raw audio", async () => {
-    const withAudio = { ...result, pcm: "private-audio", embedding: [0.1, 0.2] };
+    const withAudio = {
+      ...result,
+      pcm: "private-audio",
+      embedding: [0.1, 0.2],
+      f0ContourHz: [180, 220, 260],
+      waveform: [0.1, 0.4],
+      filename: "private-recording.wav",
+    };
     const payload = await encodeSharedResult(withAudio);
     const decoded = await decodeSharedResult(payload);
 
     expect(decoded).toEqual(result);
-    expect(JSON.stringify(decoded)).not.toMatch(/pcm|embedding|audio/i);
+    expect(JSON.stringify(decoded)).not.toMatch(/pcm|embedding|audio|contour|waveform|filename/i);
   });
 
   it("rejects a corrupted fragment rather than displaying invented results", async () => {
