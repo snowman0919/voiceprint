@@ -7,15 +7,27 @@ import { downloadSummaryPng, downloadText } from "@/lib/download";
 import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal } from "@/lib/results";
 import { brand } from "@/lib/brand";
 
-type InputInfo = { sampleRate: number; durationSeconds: number; source: string; processing?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean } };
+type InputInfo = {
+  sampleRate: number;
+  durationSeconds: number;
+  source: string;
+  processing?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean };
+};
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
 type CapturedPcm = { pcm: ArrayBuffer; dropped: boolean };
 type AnalysisStage = "input" | "pitch" | "timbre" | "finalizing";
 
-const stageLabels: Record<AnalysisStage, string> = { input: "입력 확인", pitch: "음높이 분석", timbre: "음색 분석", finalizing: "결과 정리" };
+const stageLabels: Record<AnalysisStage, string> = {
+  input: "입력 확인",
+  pitch: "음높이 분석",
+  timbre: "음색 분석",
+  finalizing: "결과 정리",
+};
 
 function formatSeconds(value: number) {
-  return `${Math.floor(value / 60)}:${Math.floor(value % 60).toString().padStart(2, "0")}`;
+  return `${Math.floor(value / 60)}:${Math.floor(value % 60)
+    .toString()
+    .padStart(2, "0")}`;
 }
 
 export function Recorder() {
@@ -48,20 +60,37 @@ export function Recorder() {
     if (meter.current) window.cancelAnimationFrame(meter.current);
   }
 
-  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string, processing?: InputInfo["processing"], droppedFrames = false) {
+  async function inspectPcm(
+    pcm: Float32Array,
+    sampleRate: number,
+    source: string,
+    processing?: InputInfo["processing"],
+    droppedFrames = false,
+  ) {
     setState("checking");
     setAnalysisStage("input");
     setAnalysis(undefined);
     try {
-      const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>((resolve, reject) => {
-        const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
-        worker.onmessage = ({ data }) => {
-          if (data.type === "stage") { setAnalysisStage(data.value as AnalysisStage); return; }
-          if (data.type === "result") { worker.terminate(); resolve(data); }
-        };
-        worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
-        worker.postMessage({ pcm: pcm.buffer, sampleRate, droppedFrames }, [pcm.buffer]);
-      });
+      const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>(
+        (resolve, reject) => {
+          const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
+          worker.onmessage = ({ data }) => {
+            if (data.type === "stage") {
+              setAnalysisStage(data.value as AnalysisStage);
+              return;
+            }
+            if (data.type === "result") {
+              worker.terminate();
+              resolve(data);
+            }
+          };
+          worker.onerror = () => {
+            worker.terminate();
+            reject(new Error("품질 검사를 시작할 수 없습니다."));
+          };
+          worker.postMessage({ pcm: pcm.buffer, sampleRate, droppedFrames }, [pcm.buffer]);
+        },
+      );
       setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source, processing });
       setQuality(result.quality);
       setDsp(result.dsp);
@@ -126,7 +155,10 @@ export function Recorder() {
       const draw = () => {
         analyser.getByteTimeDomainData(samples);
         let sum = 0;
-        samples.forEach((sample) => { const normalized = (sample - 128) / 128; sum += normalized * normalized; });
+        samples.forEach((sample) => {
+          const normalized = (sample - 128) / 128;
+          sum += normalized * normalized;
+        });
         setLevel(Math.min(1, Math.sqrt(sum / samples.length) * 4));
         meter.current = window.requestAnimationFrame(draw);
       };
@@ -151,7 +183,9 @@ export function Recorder() {
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : undefined;
       const activeRecorder = new MediaRecorder(media, mimeType ? { mimeType } : undefined);
       recorder.current = activeRecorder;
-      activeRecorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); };
+      activeRecorder.ondataavailable = ({ data }) => {
+        if (data.size) chunks.push(data);
+      };
       activeRecorder.onstop = () => {
         if (captureNode && capturedPcm) {
           captureNode.port.postMessage({ type: "flush" });
@@ -179,7 +213,9 @@ export function Recorder() {
     }
   }
 
-  function stopRecording() { recorder.current?.stop(); }
+  function stopRecording() {
+    recorder.current?.stop();
+  }
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file) void inspectBlob(file, "로컬 파일");
@@ -187,34 +223,231 @@ export function Recorder() {
 
   function startAnalysis() {
     if (!input || !quality || !dsp) return;
-    setAnalysis(createLocalAnalysis({ sampleRate: input.sampleRate, durationSeconds: input.durationSeconds, effectiveVoiceSeconds: input.durationSeconds * quality.voicedRatio }, quality, dsp, brand.appVersion, brand.dspVersion, practiceGoal));
+    setAnalysis(
+      createLocalAnalysis(
+        {
+          sampleRate: input.sampleRate,
+          durationSeconds: input.durationSeconds,
+          effectiveVoiceSeconds: input.durationSeconds * quality.voicedRatio,
+        },
+        quality,
+        dsp,
+        brand.appVersion,
+        brand.dspVersion,
+        practiceGoal,
+      ),
+    );
   }
 
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
   return (
     <section className="recorder" aria-labelledby="recording-heading">
-      <div><p className="eyebrow">입력</p><h2 id="recording-heading">목소리를 준비하세요</h2></div>
+      <div>
+        <p className="eyebrow">입력</p>
+        <h2 id="recording-heading">목소리를 준비하세요</h2>
+      </div>
       <p className="prompt">권장 15~30초. 편안한 음역에서 자연스럽게 말해 보세요.</p>
-      <div className="meter" aria-label={`입력 음량 ${Math.round(level * 100)}%`}><span style={{ transform: `scaleX(${level})` }} /></div>
+      <div className="meter" aria-label={`입력 음량 ${Math.round(level * 100)}%`}>
+        <span style={{ transform: `scaleX(${level})` }} />
+      </div>
       <p className="time">{state === "recording" ? formatSeconds(elapsed) : "0:00"} / 1:00</p>
-      {state === "recording" ? <button onClick={stopRecording} type="button">녹음 중지</button> : <button onClick={() => void startRecording()} type="button">녹음 시작</button>}
-      <label className="file"><span>또는 로컬 파일 선택</span><input accept="audio/*" onChange={selectFile} type="file" /></label>
-      {state === "checking" && <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>}
-      {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
-      {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{quality.estimatedSnrDb !== undefined && <div><dt>추정 SNR</dt><dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd></div>}{dsp?.f0MedianHz !== undefined && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz !== undefined && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}{dsp?.hnrDb !== undefined && <div><dt>HNR</dt><dd>{dsp.hnrDb.toFixed(1)}dB</dd></div>}</dl>}
-      {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}
-      <label className="goal">연습 목표<select onChange={(event) => setPracticeGoal(event.target.value as PracticeGoal)} value={practiceGoal}><option value="clarity">더 또렷하게</option><option value="stability">더 안정적으로</option><option value="brightness">더 밝게</option><option value="softness">더 부드럽게</option><option value="calm">더 낮고 차분하게</option><option value="lightness">더 높고 가볍게</option><option value="intonation">억양을 풍부하게</option><option value="relaxation">긴장감을 줄이기</option></select></label>
-      <button disabled={!canAnalyze} onClick={startAnalysis} type="button">분석 시작</button>
-      {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · {input.processing && `처리 설정: 반향 ${input.processing.echoCancellation === undefined ? "미확인" : input.processing.echoCancellation ? "켜짐" : "꺼짐"}, 소음 억제 ${input.processing.noiseSuppression === undefined ? "미확인" : input.processing.noiseSuppression ? "켜짐" : "꺼짐"}, 자동 이득 ${input.processing.autoGainControl === undefined ? "미확인" : input.processing.autoGainControl ? "켜짐" : "꺼짐"} · `}이 기기에서만 처리</p>}
-      {analysis && <section aria-labelledby="result-heading" className="result">
-        <div><p className="eyebrow">결과</p><h2 id="result-heading">측정된 음향 특징</h2></div>
-        <p>학습 모델은 아직 배포되지 않았습니다. 아래는 규칙 기반의 로컬 음향 측정입니다.</p>
-        <dl className="quality"><div><dt>F0 중앙값</dt><dd>{Math.round(analysis.acousticFeatures.f0MedianHz ?? 0)}Hz</dd></div>{analysis.acousticFeatures.f0MeanHz !== undefined && <div><dt>F0 평균</dt><dd>{Math.round(analysis.acousticFeatures.f0MeanHz)}Hz</dd></div>}<div><dt>F0 5–95%</dt><dd>{Math.round(analysis.acousticFeatures.f0P05Hz ?? 0)}–{Math.round(analysis.acousticFeatures.f0P95Hz ?? 0)}Hz</dd></div>{analysis.acousticFeatures.f0SemitoneRange !== undefined && <div><dt>F0 범위</dt><dd>{analysis.acousticFeatures.f0SemitoneRange.toFixed(1)}st</dd></div>}{analysis.acousticFeatures.f0Stability !== undefined && <div><dt>F0 안정성</dt><dd>{Math.round(analysis.acousticFeatures.f0Stability)}/100</dd></div>}<div><dt>스펙트럼 중심</dt><dd>{Math.round(analysis.acousticFeatures.spectralCentroidHz ?? 0)}Hz</dd></div>{analysis.acousticFeatures.spectralBandwidthHz !== undefined && <div><dt>스펙트럼 대역폭</dt><dd>{Math.round(analysis.acousticFeatures.spectralBandwidthHz)}Hz</dd></div>}{analysis.acousticFeatures.spectralRolloff85Hz !== undefined && <div><dt>roll-off 85%</dt><dd>{Math.round(analysis.acousticFeatures.spectralRolloff85Hz)}Hz</dd></div>}{analysis.acousticFeatures.spectralFlatness !== undefined && <div><dt>스펙트럼 평탄도</dt><dd>{analysis.acousticFeatures.spectralFlatness.toFixed(3)}</dd></div>}{analysis.acousticFeatures.hnrDb !== undefined && <div><dt>HNR</dt><dd>{analysis.acousticFeatures.hnrDb.toFixed(1)}dB</dd></div>}<div><dt>입력 품질</dt><dd>{analysis.quality.score}</dd></div></dl>
-        <h3>연습 제안</h3>
-        <ul>{analysis.recommendations.map((recommendation) => <li key={recommendation}>{recommendation}</li>)}</ul>
-        <p className="safety">이 가이드는 음향적 연습 제안이며 의료 조언이 아닙니다. 통증 또는 불편감이 지속되면 연습을 중단하고 전문가와 상담하세요.</p>
-        <div className="downloads"><button onClick={() => downloadText(JSON.stringify(analysis, null, 2), "voiceprint-result.json", "application/json")} type="button">JSON 다운로드</button><button onClick={() => downloadText(scalarCsv(analysis), "voiceprint-features.csv", "text/csv")} type="button">CSV 다운로드</button><button onClick={() => downloadSummaryPng(analysis)} type="button">PNG 다운로드</button></div>
-      </section>}
+      {state === "recording" ? (
+        <button onClick={stopRecording} type="button">
+          녹음 중지
+        </button>
+      ) : (
+        <button onClick={() => void startRecording()} type="button">
+          녹음 시작
+        </button>
+      )}
+      <label className="file">
+        <span>또는 로컬 파일 선택</span>
+        <input accept="audio/*" onChange={selectFile} type="file" />
+      </label>
+      {state === "checking" && (
+        <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>
+      )}
+      {message && (
+        <p className={quality?.issues.length ? "warning" : "error"} role="status">
+          {message}
+        </p>
+      )}
+      {quality && input && (
+        <dl className="quality">
+          <div>
+            <dt>길이</dt>
+            <dd>{input.durationSeconds.toFixed(1)}초</dd>
+          </div>
+          <div>
+            <dt>입력 음량</dt>
+            <dd>{Math.round(quality.rms * 100)}%</dd>
+          </div>
+          <div>
+            <dt>clipping</dt>
+            <dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd>
+          </div>
+          <div>
+            <dt>유성음</dt>
+            <dd>{Math.round(quality.voicedRatio * 100)}%</dd>
+          </div>
+          {quality.estimatedSnrDb !== undefined && (
+            <div>
+              <dt>추정 SNR</dt>
+              <dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd>
+            </div>
+          )}
+          {dsp?.f0MedianHz !== undefined && (
+            <div>
+              <dt>F0 중앙값</dt>
+              <dd>{Math.round(dsp.f0MedianHz)}Hz</dd>
+            </div>
+          )}
+          {dsp?.spectralCentroidHz !== undefined && (
+            <div>
+              <dt>스펙트럼 중심</dt>
+              <dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd>
+            </div>
+          )}
+          {dsp?.hnrDb !== undefined && (
+            <div>
+              <dt>HNR</dt>
+              <dd>{dsp.hnrDb.toFixed(1)}dB</dd>
+            </div>
+          )}
+        </dl>
+      )}
+      {waveform && (
+        <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">
+          {waveform.map((peak, index) => (
+            <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />
+          ))}
+        </svg>
+      )}
+      <label className="goal">
+        연습 목표
+        <select onChange={(event) => setPracticeGoal(event.target.value as PracticeGoal)} value={practiceGoal}>
+          <option value="clarity">더 또렷하게</option>
+          <option value="stability">더 안정적으로</option>
+          <option value="brightness">더 밝게</option>
+          <option value="softness">더 부드럽게</option>
+          <option value="calm">더 낮고 차분하게</option>
+          <option value="lightness">더 높고 가볍게</option>
+          <option value="intonation">억양을 풍부하게</option>
+          <option value="relaxation">긴장감을 줄이기</option>
+        </select>
+      </label>
+      <button disabled={!canAnalyze} onClick={startAnalysis} type="button">
+        분석 시작
+      </button>
+      {input && (
+        <p className="metadata">
+          {input.source} · {input.sampleRate.toLocaleString()}Hz ·{" "}
+          {input.processing &&
+            `처리 설정: 반향 ${input.processing.echoCancellation === undefined ? "미확인" : input.processing.echoCancellation ? "켜짐" : "꺼짐"}, 소음 억제 ${input.processing.noiseSuppression === undefined ? "미확인" : input.processing.noiseSuppression ? "켜짐" : "꺼짐"}, 자동 이득 ${input.processing.autoGainControl === undefined ? "미확인" : input.processing.autoGainControl ? "켜짐" : "꺼짐"} · `}
+          이 기기에서만 처리
+        </p>
+      )}
+      {analysis && (
+        <section aria-labelledby="result-heading" className="result">
+          <div>
+            <p className="eyebrow">결과</p>
+            <h2 id="result-heading">측정된 음향 특징</h2>
+          </div>
+          <p>학습 모델은 아직 배포되지 않았습니다. 아래는 규칙 기반의 로컬 음향 측정입니다.</p>
+          <dl className="quality">
+            <div>
+              <dt>F0 중앙값</dt>
+              <dd>{Math.round(analysis.acousticFeatures.f0MedianHz ?? 0)}Hz</dd>
+            </div>
+            {analysis.acousticFeatures.f0MeanHz !== undefined && (
+              <div>
+                <dt>F0 평균</dt>
+                <dd>{Math.round(analysis.acousticFeatures.f0MeanHz)}Hz</dd>
+              </div>
+            )}
+            <div>
+              <dt>F0 5–95%</dt>
+              <dd>
+                {Math.round(analysis.acousticFeatures.f0P05Hz ?? 0)}–
+                {Math.round(analysis.acousticFeatures.f0P95Hz ?? 0)}Hz
+              </dd>
+            </div>
+            {analysis.acousticFeatures.f0SemitoneRange !== undefined && (
+              <div>
+                <dt>F0 범위</dt>
+                <dd>{analysis.acousticFeatures.f0SemitoneRange.toFixed(1)}st</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.f0Stability !== undefined && (
+              <div>
+                <dt>F0 안정성</dt>
+                <dd>{Math.round(analysis.acousticFeatures.f0Stability)}/100</dd>
+              </div>
+            )}
+            <div>
+              <dt>스펙트럼 중심</dt>
+              <dd>{Math.round(analysis.acousticFeatures.spectralCentroidHz ?? 0)}Hz</dd>
+            </div>
+            {analysis.acousticFeatures.spectralBandwidthHz !== undefined && (
+              <div>
+                <dt>스펙트럼 대역폭</dt>
+                <dd>{Math.round(analysis.acousticFeatures.spectralBandwidthHz)}Hz</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.spectralRolloff85Hz !== undefined && (
+              <div>
+                <dt>roll-off 85%</dt>
+                <dd>{Math.round(analysis.acousticFeatures.spectralRolloff85Hz)}Hz</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.spectralFlatness !== undefined && (
+              <div>
+                <dt>스펙트럼 평탄도</dt>
+                <dd>{analysis.acousticFeatures.spectralFlatness.toFixed(3)}</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.hnrDb !== undefined && (
+              <div>
+                <dt>HNR</dt>
+                <dd>{analysis.acousticFeatures.hnrDb.toFixed(1)}dB</dd>
+              </div>
+            )}
+            <div>
+              <dt>입력 품질</dt>
+              <dd>{analysis.quality.score}</dd>
+            </div>
+          </dl>
+          <h3>연습 제안</h3>
+          <ul>
+            {analysis.recommendations.map((recommendation) => (
+              <li key={recommendation}>{recommendation}</li>
+            ))}
+          </ul>
+          <p className="safety">
+            이 가이드는 음향적 연습 제안이며 의료 조언이 아닙니다. 통증 또는 불편감이 지속되면 연습을 중단하고 전문가와
+            상담하세요.
+          </p>
+          <div className="downloads">
+            <button
+              onClick={() =>
+                downloadText(JSON.stringify(analysis, null, 2), "voiceprint-result.json", "application/json")
+              }
+              type="button"
+            >
+              JSON 다운로드
+            </button>
+            <button
+              onClick={() => downloadText(scalarCsv(analysis), "voiceprint-features.csv", "text/csv")}
+              type="button"
+            >
+              CSV 다운로드
+            </button>
+            <button onClick={() => downloadSummaryPng(analysis)} type="button">
+              PNG 다운로드
+            </button>
+          </div>
+        </section>
+      )}
     </section>
   );
 }

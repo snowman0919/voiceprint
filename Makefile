@@ -22,6 +22,9 @@ benchmark-dsp-compile:
 lint:
 	pnpm lint
 
+format-check:
+	pnpm format:check
+
 typecheck: build-wasm
 	pnpm --dir apps/web exec tsc --noEmit
 

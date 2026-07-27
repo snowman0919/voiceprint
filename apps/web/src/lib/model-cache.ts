@@ -1,4 +1,15 @@
-export type ModelEntry = { id: string; version: string; url: string; size: number; sha256: string; inputSampleRate: number; inputSeconds: number; opset: number; quantization: string; minimumAppVersion: string };
+export type ModelEntry = {
+  id: string;
+  version: string;
+  url: string;
+  size: number;
+  sha256: string;
+  inputSampleRate: number;
+  inputSeconds: number;
+  opset: number;
+  quantization: string;
+  minimumAppVersion: string;
+};
 export type ModelManifest = { schemaVersion: 1; activeModel: string | null; models: ModelEntry[] };
 
 const cacheName = "voiceprint-models-v1";
@@ -10,22 +21,47 @@ export function allowsAutoDownload(saveData: boolean | undefined) {
 export function validateManifest(value: unknown): value is ModelManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<ModelManifest>;
-  if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.models) || (typeof manifest.activeModel !== "string" && manifest.activeModel !== null)) return false;
+  if (
+    manifest.schemaVersion !== 1 ||
+    !Array.isArray(manifest.models) ||
+    (typeof manifest.activeModel !== "string" && manifest.activeModel !== null)
+  )
+    return false;
   const validModel = (model: unknown): model is ModelEntry => {
     if (!model || typeof model !== "object") return false;
     const entry = model as Partial<ModelEntry>;
-    return typeof entry.id === "string" && entry.id.length > 0
-      && typeof entry.version === "string" && entry.version.length > 0
-      && typeof entry.url === "string" && entry.url.startsWith("/models/")
-      && typeof entry.size === "number" && Number.isInteger(entry.size) && entry.size > 0
-      && typeof entry.sha256 === "string" && /^[a-f0-9]{64}$/i.test(entry.sha256)
-      && typeof entry.inputSampleRate === "number" && Number.isInteger(entry.inputSampleRate) && entry.inputSampleRate > 0
-      && typeof entry.inputSeconds === "number" && Number.isInteger(entry.inputSeconds) && entry.inputSeconds > 0 && entry.inputSeconds <= 60
-      && typeof entry.opset === "number" && Number.isInteger(entry.opset) && entry.opset > 0
-      && typeof entry.quantization === "string" && entry.quantization.length > 0
-      && typeof entry.minimumAppVersion === "string" && entry.minimumAppVersion.length > 0;
+    return (
+      typeof entry.id === "string" &&
+      entry.id.length > 0 &&
+      typeof entry.version === "string" &&
+      entry.version.length > 0 &&
+      typeof entry.url === "string" &&
+      entry.url.startsWith("/models/") &&
+      typeof entry.size === "number" &&
+      Number.isInteger(entry.size) &&
+      entry.size > 0 &&
+      typeof entry.sha256 === "string" &&
+      /^[a-f0-9]{64}$/i.test(entry.sha256) &&
+      typeof entry.inputSampleRate === "number" &&
+      Number.isInteger(entry.inputSampleRate) &&
+      entry.inputSampleRate > 0 &&
+      typeof entry.inputSeconds === "number" &&
+      Number.isInteger(entry.inputSeconds) &&
+      entry.inputSeconds > 0 &&
+      entry.inputSeconds <= 60 &&
+      typeof entry.opset === "number" &&
+      Number.isInteger(entry.opset) &&
+      entry.opset > 0 &&
+      typeof entry.quantization === "string" &&
+      entry.quantization.length > 0 &&
+      typeof entry.minimumAppVersion === "string" &&
+      entry.minimumAppVersion.length > 0
+    );
   };
-  return manifest.models.every(validModel) && (manifest.activeModel === null || manifest.models.some((model) => model.id === manifest.activeModel));
+  return (
+    manifest.models.every(validModel) &&
+    (manifest.activeModel === null || manifest.models.some((model) => model.id === manifest.activeModel))
+  );
 }
 
 export async function loadManifest() {
@@ -45,11 +81,19 @@ export async function cachedModelBytes(model: ModelEntry) {
   return response.arrayBuffer();
 }
 
-export async function clearModelCache() { await caches.delete(cacheName); }
+export async function clearModelCache() {
+  await caches.delete(cacheName);
+}
 
-function hex(bytes: ArrayBuffer) { return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join(""); }
+function hex(bytes: ArrayBuffer) {
+  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
+}
 
-export async function downloadAndVerify(model: ModelEntry, onProgress: (received: number) => void, signal?: AbortSignal) {
+export async function downloadAndVerify(
+  model: ModelEntry,
+  onProgress: (received: number) => void,
+  signal?: AbortSignal,
+) {
   const response = await fetch(model.url, { signal, cache: "no-store" });
   if (!response.ok || !response.body) throw new Error("모델을 내려받을 수 없습니다.");
   const chunks: Uint8Array[] = [];
@@ -65,8 +109,12 @@ export async function downloadAndVerify(model: ModelEntry, onProgress: (received
   if (received !== model.size) throw new Error("모델 크기가 manifest와 일치하지 않습니다.");
   const bytes = new Uint8Array(received);
   let offset = 0;
-  chunks.forEach((chunk) => { bytes.set(chunk, offset); offset += chunk.length; });
-  if (hex(await crypto.subtle.digest("SHA-256", bytes)) !== model.sha256.toLowerCase()) throw new Error("모델 무결성 검증에 실패했습니다.");
+  chunks.forEach((chunk) => {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  });
+  if (hex(await crypto.subtle.digest("SHA-256", bytes)) !== model.sha256.toLowerCase())
+    throw new Error("모델 무결성 검증에 실패했습니다.");
   const verified = new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } });
   await (await caches.open(cacheName)).put(model.url, verified);
 }

@@ -12,7 +12,27 @@ export function DeviceStatus() {
     const frame = window.requestAnimationFrame(() => setIssues(next));
     return () => window.cancelAnimationFrame(frame);
   }, []);
-  if (!issues) return <p role="status" className="metadata">기기 호환성 확인 중…</p>;
-  if (!issues.length) return <p role="status" className="metadata">이 기기에서 로컬 분석을 실행할 수 있습니다.</p>;
-  return <section className="error" role="alert"><strong>일부 기능을 사용할 수 없습니다.</strong><ul>{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul><p>로컬 파일 선택은 브라우저 지원 범위에서 계속 시도할 수 있습니다.</p></section>;
+  if (!issues)
+    return (
+      <p role="status" className="metadata">
+        기기 호환성 확인 중…
+      </p>
+    );
+  if (!issues.length)
+    return (
+      <p role="status" className="metadata">
+        이 기기에서 로컬 분석을 실행할 수 있습니다.
+      </p>
+    );
+  return (
+    <section className="error" role="alert">
+      <strong>일부 기능을 사용할 수 없습니다.</strong>
+      <ul>
+        {issues.map((issue) => (
+          <li key={issue}>{issue}</li>
+        ))}
+      </ul>
+      <p>로컬 파일 선택은 브라우저 지원 범위에서 계속 시도할 수 있습니다.</p>
+    </section>
+  );
 }

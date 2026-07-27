@@ -46,9 +46,10 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
   const quiet = frameRmsValues.filter((value) => value < 0.006);
   const voiced = frameRmsValues.filter((value) => value >= 0.015);
   const average = (values: number[]) => values.reduce((total, value) => total + value, 0) / values.length;
-  const estimatedSnrDb = quiet.length && voiced.length
-    ? 20 * Math.log10(Math.max(average(voiced), 1e-8) / Math.max(average(quiet), 1e-8))
-    : undefined;
+  const estimatedSnrDb =
+    quiet.length && voiced.length
+      ? 20 * Math.log10(Math.max(average(voiced), 1e-8) / Math.max(average(quiet), 1e-8))
+      : undefined;
   const issues: string[] = [];
   if (durationSeconds < 7.99) issues.push("유효 음성이 8초보다 짧습니다.");
   if (durationSeconds > 60) issues.push("60초를 초과한 파일은 구간을 선택한 뒤 다시 시도하세요.");

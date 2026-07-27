@@ -15,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body><StaticCacheRegistration />{children}</body>
+      <body>
+        <StaticCacheRegistration />
+        {children}
+      </body>
     </html>
   );
 }

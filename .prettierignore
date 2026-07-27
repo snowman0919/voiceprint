@@ -1,0 +1,9 @@
+node_modules/
+target/
+apps/web/out/
+apps/web/public/wasm/
+apps/web/src/generated/
+apps/web/test-results/
+fixtures/audio/
+ml/uv.lock
+pnpm-lock.yaml

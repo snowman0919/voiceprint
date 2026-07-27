@@ -6,6 +6,11 @@
     "dev": "pnpm --dir apps/web dev",
     "build": "pnpm build:wasm && pnpm --dir apps/web build",
     "build:wasm": "./scripts/build-wasm.sh",
-    "lint": "pnpm --dir apps/web lint"
+    "lint": "pnpm --dir apps/web lint",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "3.7.4"
   }
 }

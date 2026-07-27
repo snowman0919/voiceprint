@@ -5,7 +5,9 @@ import { peakEnvelope } from "@/lib/waveform";
 type Request = { pcm: ArrayBuffer; sampleRate: number; droppedFrames?: boolean };
 type Stage = "input" | "pitch" | "timbre" | "finalizing";
 
-function stage(value: Stage) { self.postMessage({ type: "stage", value }); }
+function stage(value: Stage) {
+  self.postMessage({ type: "stage", value });
+}
 
 async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSummary> {
   const wasm = await import("@/generated/voice_dsp.js");
@@ -26,11 +28,16 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   }
   stage("timbre");
   const centroidFrame = analysisPcm.subarray(0, Math.min(1024, analysisPcm.length));
-  const centroid = centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
-  const bandwidth = centroidFrame.length === 1024 ? wasm.spectral_bandwidth_hz(centroidFrame, analysisSampleRate) : Number.NaN;
-  const rolloff85 = centroidFrame.length === 1024 ? wasm.spectral_rolloff_85_hz(centroidFrame, analysisSampleRate) : Number.NaN;
-  const rolloff95 = centroidFrame.length === 1024 ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate) : Number.NaN;
-  const flatness = centroidFrame.length === 1024 ? wasm.spectral_flatness(centroidFrame, analysisSampleRate) : Number.NaN;
+  const centroid =
+    centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const bandwidth =
+    centroidFrame.length === 1024 ? wasm.spectral_bandwidth_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const rolloff85 =
+    centroidFrame.length === 1024 ? wasm.spectral_rolloff_85_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const rolloff95 =
+    centroidFrame.length === 1024 ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const flatness =
+    centroidFrame.length === 1024 ? wasm.spectral_flatness(centroidFrame, analysisSampleRate) : Number.NaN;
   return {
     ...summarizeF0(f0),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,

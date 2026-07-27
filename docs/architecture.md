@@ -14,11 +14,11 @@ The model manifest is intentionally empty until an approved dataset, reproducibl
 
 ## Execution boundaries
 
-| Component | Runs in | Persistent data |
-| --- | --- | --- |
-| Capture | AudioWorklet | bounded in-memory PCM only |
-| Quality and DSP | Web Worker + Rust/WASM | no persistent audio |
-| Model | ONNX Runtime Web | verified model Cache Storage entry |
-| Downloads | browser | only when the user saves a file |
+| Component       | Runs in                | Persistent data                    |
+| --------------- | ---------------------- | ---------------------------------- |
+| Capture         | AudioWorklet           | bounded in-memory PCM only         |
+| Quality and DSP | Web Worker + Rust/WASM | no persistent audio                |
+| Model           | ONNX Runtime Web       | verified model Cache Storage entry |
+| Downloads       | browser                | only when the user saves a file    |
 
 WebGPU is attempted first for an installed model; ONNX Runtime Web falls back to WASM. The UI reports `GPU` or `CPU/WASM`, not a browser error message.

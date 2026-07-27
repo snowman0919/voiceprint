@@ -21,7 +21,20 @@ function percentile(values: number[], fraction: number) {
   return values[index];
 }
 
-export function summarizeF0(values: number[]): Pick<DspSummary, "f0MedianHz" | "f0MeanHz" | "f0StdDevHz" | "f0P05Hz" | "f0P95Hz" | "f0SemitoneRange" | "f0Stability" | "f0ContourHz" | "frames"> {
+export function summarizeF0(
+  values: number[],
+): Pick<
+  DspSummary,
+  | "f0MedianHz"
+  | "f0MeanHz"
+  | "f0StdDevHz"
+  | "f0P05Hz"
+  | "f0P95Hz"
+  | "f0SemitoneRange"
+  | "f0Stability"
+  | "f0ContourHz"
+  | "frames"
+> {
   if (!values.length) return { frames: 0 };
   const sorted = [...values].sort((left, right) => left - right);
   const mean = values.reduce((total, value) => total + value, 0) / values.length;

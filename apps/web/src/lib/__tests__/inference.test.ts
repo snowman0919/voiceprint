@@ -17,6 +17,11 @@ describe("createSessionWithFallback", () => {
 describe("normalizeTendencyOutput", () => {
   it("rejects outputs outside the model's sigmoid tendency contract", () => {
     expect(() => normalizeTendencyOutput([0.2, 1.1, 0.5, 0.6])).toThrow("출력 범위");
-    expect(normalizeTendencyOutput([0.2, 0.4, 0.6, 0.8])).toEqual({ impression: 20, brightness: 40, softness: 60, stability: 80 });
+    expect(normalizeTendencyOutput([0.2, 0.4, 0.6, 0.8])).toEqual({
+      impression: 20,
+      brightness: 40,
+      softness: 60,
+      stability: 80,
+    });
   });
 });
