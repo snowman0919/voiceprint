@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { StaticCacheRegistration } from "@/features/device/static-cache-registration";
 import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -14,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body><StaticCacheRegistration />{children}</body>
     </html>
   );
 }
