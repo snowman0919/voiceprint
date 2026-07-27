@@ -13,6 +13,9 @@ build-wasm:
 test-wasm:
 	cargo test -p voice-dsp
 
+benchmark-dsp:
+	cargo bench -p voice-dsp
+
 lint:
 	pnpm lint
 

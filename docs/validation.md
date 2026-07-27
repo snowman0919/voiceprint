@@ -8,6 +8,10 @@
 - Playwright loads a real local WAV, runs analysis, and asserts that no POST/PUT/PATCH request is made and every observed request remains on the local static origin.
 - CI builds the static export, installs Chromium for the browser flow, and builds the multi-stage Docker image.
 
+## DSP benchmark
+
+`make benchmark-dsp` measures F0, HNR, and a 1024-point spectrum on an 80 ms 24 kHz periodic frame. Record the machine, browser/WASM version when applicable, and benchmark output when comparing releases; do not compare optimized native timings directly with browser timings.
+
 ## Before publishing a trained model
 
 1. Audit the exact dataset version and license; stop if redistribution or model use is unclear.
