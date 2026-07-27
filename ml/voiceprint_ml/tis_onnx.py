@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -53,10 +54,22 @@ def validate(checkpoint: Path, onnx_model: Path, sample_rate: int = 16_000, seco
         reference = model(waveform).numpy()
     session = ort.InferenceSession(onnx_model, providers=["CPUExecutionProvider"])
     candidate = session.run(["trustworthy_intent"], {"waveform": waveform.numpy()})[0]
+    for _ in range(3):
+        session.run(["trustworthy_intent"], {"waveform": waveform.numpy()})
+    started = time.perf_counter()
+    for _ in range(20):
+        session.run(["trustworthy_intent"], {"waveform": waveform.numpy()})
+    warm_latency_ms = (time.perf_counter() - started) * 1_000 / 20
     maximum_absolute_error = float(np.max(np.abs(reference - candidate)))
     if maximum_absolute_error > tolerance:
         raise RuntimeError(f"ONNX parity exceeded tolerance: {maximum_absolute_error} > {tolerance}")
-    return {"maximum_absolute_error": maximum_absolute_error, "tolerance": tolerance}
+    return {
+        "maximum_absolute_error": maximum_absolute_error,
+        "tolerance": tolerance,
+        "warm_cpu_latency_ms": warm_latency_ms,
+        "parameter_count": float(sum(parameter.numel() for parameter in model.parameters())),
+        "onnx_size_bytes": float(onnx_model.stat().st_size),
+    }
 
 
 def main() -> None:
