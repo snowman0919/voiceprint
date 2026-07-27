@@ -18,11 +18,17 @@ def speaker_disjoint_split(rows: Iterable[dict[str, str]], seed: int = 42) -> li
             raise ValueError("speaker_id is required; file-level split would leak speaker identity.")
         grouped[speaker].append(dict(row))
     speakers = list(grouped)
+    if len(speakers) < 3:
+        raise ValueError("at least three speakers are required for train/validation/test separation.")
     random.Random(seed).shuffle(speakers)
-    targets = (round(len(speakers) * 0.8), round(len(speakers) * 0.1))
+    validation_count = max(1, round(len(speakers) * 0.1))
+    test_count = max(1, round(len(speakers) * 0.1))
+    train_count = len(speakers) - validation_count - test_count
+    if train_count < 1:
+        raise ValueError("speaker split leaves no training speakers.")
     output: list[dict[str, str]] = []
     for index, speaker in enumerate(speakers):
-        split = "train" if index < targets[0] else "validation" if index < sum(targets) else "test"
+        split = "train" if index < train_count else "validation" if index < train_count + validation_count else "test"
         output.extend({**row, "split": split} for row in grouped[speaker])
     return output
 
