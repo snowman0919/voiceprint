@@ -8,6 +8,7 @@ make data-audit
 PYTHONPATH=ml python -m voiceprint_ml.split approved-manifest.csv ml/data/approved/manifest.csv
 make train
 make export-onnx
+make validate-onnx
 make model-manifest
 ```
 
@@ -16,3 +17,5 @@ make model-manifest
 The best validation checkpoint is saved locally under `ml/checkpoints/` (ignored by Git). After training it is reloaded for a one-time untouched test-split loss, written beside it as `.metrics.json`. Do not add a model to the web manifest until the model card records the data audit, held-out metrics, ONNX parity, hash, and known limitations.
 
 `make model-manifest` hashes the exact ONNX bytes in `apps/web/public/models/` and writes the size, local URL, input contract, and SHA-256 into the static manifest. Review the generated metadata and its matching model card before committing either artifact.
+
+`make validate-onnx` runs the checkpoint and exported ONNX model against the same seeded waveform using CPU ONNX Runtime. It fails when maximum absolute output error exceeds `1e-4`; record the result in the model card before browser deployment.

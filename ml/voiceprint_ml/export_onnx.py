@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import onnx
 import torch
 
 from .model import VoiceImpressionNet
@@ -17,6 +18,7 @@ def export(checkpoint: Path, output: Path, sample_rate: int = 16000, seconds: in
     sample = torch.zeros(1, 1, sample_rate * seconds)
     output.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(model, sample, output, input_names=["waveform"], output_names=["tendencies"], opset_version=18)
+    onnx.checker.check_model(onnx.load(output))
 
 
 def main() -> None:
