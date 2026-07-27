@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSessionWithFallback, normalizeTendencyOutput } from "../inference";
+import {
+  createSessionWithFallback,
+  normalizeTendencyOutput,
+  normalizeTisIntentOutput,
+  resampleModelWindow,
+} from "../inference";
 
 describe("createSessionWithFallback", () => {
   it("uses local WASM only when WebGPU session creation fails", async () => {
@@ -11,6 +16,17 @@ describe("createSessionWithFallback", () => {
     await expect(createSessionWithFallback(create)).resolves.toEqual({ backend: "wasm", session: "wasm-session" });
     expect(create).toHaveBeenNthCalledWith(1, "webgpu");
     expect(create).toHaveBeenNthCalledWith(2, "wasm");
+  });
+});
+
+describe("TIS inference contract", () => {
+  it("keeps an input window's endpoints when converting its sample rate", () => {
+    expect(Array.from(resampleModelWindow(new Float32Array([0, 1, 2, 3]), 4, 2, 2, 0))).toEqual([0, 2, 0, 0]);
+  });
+
+  it("rejects a non-probability TIS model score", () => {
+    expect(() => normalizeTisIntentOutput([1.01])).toThrow("출력 범위");
+    expect(normalizeTisIntentOutput([0.496])).toEqual({ score: 50 });
   });
 });
 

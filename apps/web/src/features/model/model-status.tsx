@@ -38,7 +38,7 @@ export function ModelStatus() {
         worker.terminate();
         reject(new Error("이 기기에서 분석 모델을 시작할 수 없습니다."));
       };
-      worker.postMessage({ model: active });
+      worker.postMessage({ type: "warm", model: active });
     });
   }, []);
 
