@@ -21,4 +21,4 @@ The source checkout keeps the model manifest empty because generated checkpoints
 | Model           | ONNX Runtime Web       | verified model Cache Storage entry |
 | Downloads       | browser                | only when the user saves a file    |
 
-WebGPU is attempted first for an installed model; ONNX Runtime Web falls back to WASM. The UI reports `GPU` or `CPU/WASM`, not a browser error message.
+WebGPU is attempted first for an installed model; ONNX Runtime Web falls back to WASM. Before inference, the model Worker uses the shared Rust/WASM band-limited resampler to derive the fixed 16 kHz model stream. The UI reports `GPU` or `CPU/WASM`, not a browser error message.

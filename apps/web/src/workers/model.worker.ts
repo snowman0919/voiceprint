@@ -20,10 +20,17 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
       self.postMessage({ type: "ready", backend: session.backend });
       return;
     }
+    const source = new Float32Array(data.pcm);
+    const wasm = await import("@/generated/voice_dsp.js");
+    await wasm.default(new URL("/wasm/voice_dsp_bg.wasm", self.location.origin));
+    const modelPcm =
+      data.sampleRate === data.model.inputSampleRate
+        ? source
+        : wasm.resample_to_rate(source, data.sampleRate, data.model.inputSampleRate);
     const result = await runTisIntentInference(
       session,
-      new Float32Array(data.pcm),
-      data.sampleRate,
+      modelPcm,
+      data.model.inputSampleRate,
       data.model.inputSampleRate,
       data.model.inputSeconds,
     );

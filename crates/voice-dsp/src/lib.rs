@@ -562,6 +562,11 @@ pub fn resample_to_24khz(samples: &[f32], source_rate: f32) -> Vec<f32> {
     resample_bandlimited(samples, source_rate, 24_000.0)
 }
 
+#[wasm_bindgen]
+pub fn resample_to_rate(samples: &[f32], source_rate: f32, target_rate: f32) -> Vec<f32> {
+    resample_bandlimited(samples, source_rate, target_rate)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
