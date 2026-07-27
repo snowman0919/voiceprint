@@ -10,6 +10,9 @@ import { brand } from "@/lib/brand";
 type InputInfo = { sampleRate: number; durationSeconds: number; source: string; processing?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean } };
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
 type CapturedPcm = { pcm: ArrayBuffer; dropped: boolean };
+type AnalysisStage = "input" | "pitch" | "timbre" | "finalizing";
+
+const stageLabels: Record<AnalysisStage, string> = { input: "입력 확인", pitch: "음높이 분석", timbre: "음색 분석", finalizing: "결과 정리" };
 
 function formatSeconds(value: number) {
   return `${Math.floor(value / 60)}:${Math.floor(value % 60).toString().padStart(2, "0")}`;
@@ -24,6 +27,7 @@ export function Recorder() {
   const [waveform, setWaveform] = useState<number[]>();
   const [input, setInput] = useState<InputInfo>();
   const [message, setMessage] = useState<string>();
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>();
   const [analysis, setAnalysis] = useState<LocalAnalysis>();
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
@@ -45,11 +49,15 @@ export function Recorder() {
 
   async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string, processing?: InputInfo["processing"]) {
     setState("checking");
+    setAnalysisStage("input");
     setAnalysis(undefined);
     try {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>((resolve, reject) => {
         const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
-        worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
+        worker.onmessage = ({ data }) => {
+          if (data.type === "stage") { setAnalysisStage(data.value as AnalysisStage); return; }
+          if (data.type === "result") { worker.terminate(); resolve(data); }
+        };
         worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
         worker.postMessage({ pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
       });
@@ -58,9 +66,11 @@ export function Recorder() {
       setDsp(result.dsp);
       setWaveform(result.waveform);
       setMessage(result.quality.issues[0]);
+      setAnalysisStage(undefined);
       setState("ready");
     } catch {
       setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
+      setAnalysisStage(undefined);
       setState("error");
     }
   }
@@ -189,7 +199,7 @@ export function Recorder() {
       <p className="time">{state === "recording" ? formatSeconds(elapsed) : "0:00"} / 1:00</p>
       {state === "recording" ? <button onClick={stopRecording} type="button">녹음 중지</button> : <button onClick={() => void startRecording()} type="button">녹음 시작</button>}
       <label className="file"><span>또는 로컬 파일 선택</span><input accept="audio/*" onChange={selectFile} type="file" /></label>
-      {state === "checking" && <p role="status">입력 품질 확인 중…</p>}
+      {state === "checking" && <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>}
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
       {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{quality.estimatedSnrDb !== undefined && <div><dt>추정 SNR</dt><dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd></div>}{dsp?.f0MedianHz !== undefined && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz !== undefined && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}{dsp?.hnrDb !== undefined && <div><dt>HNR</dt><dd>{dsp.hnrDb.toFixed(1)}dB</dd></div>}</dl>}
       {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}

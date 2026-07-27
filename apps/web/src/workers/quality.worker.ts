@@ -3,6 +3,9 @@ import type { DspSummary } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number };
+type Stage = "input" | "pitch" | "timbre" | "finalizing";
+
+function stage(value: Stage) { self.postMessage({ type: "stage", value }); }
 
 function percentile(values: number[], fraction: number) {
   const index = Math.min(values.length - 1, Math.max(0, Math.round((values.length - 1) * fraction)));
@@ -18,6 +21,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   const frameCount = Math.min(20, Math.floor(analysisPcm.length / frameSize));
   const f0: number[] = [];
   const hnr: number[] = [];
+  stage("pitch");
   for (let frame = 0; frame < frameCount; frame += 1) {
     const offset = Math.floor((analysisPcm.length - frameSize) * (frameCount === 1 ? 0 : frame / (frameCount - 1)));
     const value = wasm.estimate_f0_hz(analysisPcm.subarray(offset, offset + frameSize), analysisSampleRate);
@@ -26,6 +30,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
   }
   f0.sort((left, right) => left - right);
+  stage("timbre");
   const centroidFrame = analysisPcm.subarray(0, Math.min(1024, analysisPcm.length));
   const centroid = centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
   return {
@@ -40,10 +45,14 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
 
 self.onmessage = async ({ data }: MessageEvent<Request>) => {
   const pcm = new Float32Array(data.pcm);
+  stage("input");
   const quality = inspectAudio(pcm, data.sampleRate);
   try {
-    self.postMessage({ quality, dsp: await analyzeDsp(pcm, data.sampleRate), waveform: peakEnvelope(pcm) });
+    const dsp = await analyzeDsp(pcm, data.sampleRate);
+    stage("finalizing");
+    self.postMessage({ type: "result", quality, dsp, waveform: peakEnvelope(pcm) });
   } catch {
-    self.postMessage({ quality, dsp: undefined, waveform: peakEnvelope(pcm) });
+    stage("finalizing");
+    self.postMessage({ type: "result", quality, dsp: undefined, waveform: peakEnvelope(pcm) });
   }
 };
