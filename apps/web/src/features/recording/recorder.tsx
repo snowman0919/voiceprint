@@ -6,6 +6,7 @@ import type { DspSummary } from "@/lib/dsp";
 import { downloadSummaryPng, downloadText } from "@/lib/download";
 import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal } from "@/lib/results";
 import { brand } from "@/lib/brand";
+import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
 
 type InputInfo = {
   sampleRate: number;
@@ -16,6 +17,7 @@ type InputInfo = {
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
 type CapturedPcm = { pcm: ArrayBuffer; dropped: boolean };
 type AnalysisStage = "input" | "pitch" | "timbre" | "finalizing";
+type PendingRange = { duration: number; start: number; length: number; source: string };
 
 const stageLabels: Record<AnalysisStage, string> = {
   input: "입력 확인",
@@ -48,6 +50,8 @@ export function Recorder() {
   const timer = useRef<number | undefined>(undefined);
   const meter = useRef<number | undefined>(undefined);
   const startedAt = useRef(0);
+  const pendingAudio = useRef<AudioBuffer | null>(null);
+  const [pendingRange, setPendingRange] = useState<PendingRange>();
 
   useEffect(() => () => stopTracks(), []);
 
@@ -109,23 +113,40 @@ export function Recorder() {
     try {
       const decodeContext = new AudioContext();
       const buffer = await decodeContext.decodeAudioData(await blob.arrayBuffer());
-      if (buffer.duration > 60) {
+      if (buffer.duration > maximumRangeSeconds) {
         await decodeContext.close();
-        setMessage("60초를 초과한 파일은 필요한 구간을 선택해 60초 이하로 저장한 뒤 다시 시도하세요.");
-        setState("error");
+        pendingAudio.current = buffer;
+        setPendingRange({ duration: buffer.duration, start: 0, length: maximumRangeSeconds, source });
+        setMessage("60초를 초과한 파일입니다. 분석할 구간을 선택하세요.");
+        setState("idle");
         return;
       }
-      const mono = new Float32Array(buffer.length);
-      for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-        const samples = buffer.getChannelData(channel);
-        for (let index = 0; index < samples.length; index += 1) mono[index] += samples[index] / buffer.numberOfChannels;
-      }
+      await inspectDecodedRange(buffer, source, 0, buffer.duration);
       await decodeContext.close();
-      await inspectPcm(mono, buffer.sampleRate, source);
     } catch {
       setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
       setState("error");
     }
+  }
+
+  async function inspectDecodedRange(buffer: AudioBuffer, source: string, startSeconds: number, lengthSeconds: number) {
+    const range = normalizeRange(buffer.duration, startSeconds, lengthSeconds);
+    const startSample = Math.floor(range.start * buffer.sampleRate);
+    const endSample = Math.min(buffer.length, Math.floor((range.start + range.length) * buffer.sampleRate));
+    const mono = new Float32Array(endSample - startSample);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const samples = buffer.getChannelData(channel);
+      for (let index = startSample; index < endSample; index += 1)
+        mono[index - startSample] += samples[index] / buffer.numberOfChannels;
+    }
+    setPendingRange(undefined);
+    pendingAudio.current = null;
+    await inspectPcm(mono, buffer.sampleRate, source);
+  }
+
+  function analyzeSelectedRange() {
+    if (!pendingRange || !pendingAudio.current) return;
+    void inspectDecodedRange(pendingAudio.current, pendingRange.source, pendingRange.start, pendingRange.length);
   }
 
   async function startRecording() {
@@ -264,6 +285,47 @@ export function Recorder() {
         <span>또는 로컬 파일 선택</span>
         <input accept="audio/*" onChange={selectFile} type="file" />
       </label>
+      {pendingRange && (
+        <section className="range" aria-label="분석 구간 선택">
+          <strong>분석 구간 선택</strong>
+          <p>{pendingRange.duration.toFixed(1)}초 파일에서 분석할 범위를 정합니다.</p>
+          <label>
+            시작 {pendingRange.start.toFixed(1)}초
+            <input
+              type="range"
+              min="0"
+              max={Math.max(0, pendingRange.duration - pendingRange.length)}
+              step="0.1"
+              value={pendingRange.start}
+              onChange={(event) =>
+                setPendingRange({
+                  ...pendingRange,
+                  start: normalizeRange(pendingRange.duration, Number(event.target.value), pendingRange.length).start,
+                })
+              }
+            />
+          </label>
+          <label>
+            길이 {pendingRange.length.toFixed(1)}초
+            <input
+              type="range"
+              min={minimumRangeSeconds}
+              max={maximumRangeSeconds}
+              step="0.1"
+              value={pendingRange.length}
+              onChange={(event) =>
+                setPendingRange({
+                  ...pendingRange,
+                  ...normalizeRange(pendingRange.duration, pendingRange.start, Number(event.target.value)),
+                })
+              }
+            />
+          </label>
+          <button onClick={analyzeSelectedRange} type="button">
+            선택 구간 분석
+          </button>
+        </section>
+      )}
       {state === "checking" && (
         <p role="status">{analysisStage ? `${stageLabels[analysisStage]}…` : "분석 준비 중…"}</p>
       )}

@@ -119,6 +119,18 @@ button {
   color: #14213d;
   font: inherit;
 }
+.range {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #aab5c2;
+}
+.range label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
 .warning,
 .error {
   padding: 12px;
