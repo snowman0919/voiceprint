@@ -7,9 +7,11 @@ import csv
 import json
 import re
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.error import HTTPError, URLError
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 
@@ -54,14 +56,31 @@ def remote_files(url: str, prefix: Path = Path()) -> list[RemoteFile]:
     return files
 
 
+def retry_delay(error: Exception, attempt: int) -> int:
+    if isinstance(error, HTTPError) and error.code == 429:
+        retry_after = error.headers.get("Retry-After") if error.headers else None
+        if retry_after and retry_after.isdigit():
+            return max(5, int(retry_after))
+        return 15 * (attempt + 1)
+    return 2**attempt
+
+
 def download(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_file() and destination.stat().st_size > 0:
         return
     temporary = destination.with_suffix(f"{destination.suffix}.partial")
-    with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response, temporary.open("wb") as target:
-        shutil.copyfileobj(response, target)
-    temporary.replace(destination)
+    for attempt in range(4):
+        try:
+            with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=120) as response, temporary.open("wb") as target:
+                shutil.copyfileobj(response, target)
+            temporary.replace(destination)
+            return
+        except (HTTPError, URLError, OSError, TimeoutError) as error:
+            temporary.unlink(missing_ok=True)
+            if attempt == 3:
+                raise
+            time.sleep(retry_delay(error, attempt))
 
 
 def parse_filename(path: Path) -> tuple[str, str]:
@@ -85,7 +104,9 @@ def write_manifest(output: Path) -> None:
 
 def download_tis(output: Path) -> None:
     files = remote_files(ROOT_FILES)
-    with ThreadPoolExecutor(max_workers=32) as executor:
+    # OSF's public download endpoint rate-limits bursty clients.  Two workers
+    # allow resumable progress without turning a transient 429 into a failure.
+    with ThreadPoolExecutor(max_workers=2) as executor:
         list(executor.map(lambda remote: download(remote.download_url, output / remote.relative_path), files))
     (output / "dataset-metadata.json").write_text(
         json.dumps(

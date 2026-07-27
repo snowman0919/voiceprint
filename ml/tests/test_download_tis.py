@@ -1,8 +1,10 @@
 import unittest
+from email.message import Message
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from unittest.mock import patch
 
-from voiceprint_ml.download_tis import page_url, parse_filename, remote_files
+from voiceprint_ml.download_tis import download, page_url, parse_filename, remote_files, retry_delay
 
 
 class TisDownloadTests(unittest.TestCase):
@@ -32,6 +34,19 @@ class TisDownloadTests(unittest.TestCase):
 
     def test_requests_large_osf_pages_without_losing_existing_query_parameters(self):
         self.assertEqual(page_url("https://api.example/files?filter=name"), "https://api.example/files?filter=name&page%5Bsize%5D=100")
+
+    def test_retries_a_temporary_download_failure_before_writing_a_final_file(self):
+        with self.assertRaises(URLError), patch("voiceprint_ml.download_tis.urlopen", side_effect=URLError("offline")), patch(
+            "voiceprint_ml.download_tis.time.sleep"
+        ) as sleep:
+            download("https://example/audio.wav", Path("/tmp/voiceprint-unreachable.wav"))
+        self.assertEqual(sleep.call_count, 3)
+
+    def test_honors_osf_rate_limit_backoff_before_retrying(self):
+        headers = Message()
+        headers["Retry-After"] = "23"
+        error = HTTPError("https://osf.io/download/example", 429, "Too Many Requests", headers, None)
+        self.assertEqual(retry_delay(error, 0), 23)
 
 
 if __name__ == "__main__":
