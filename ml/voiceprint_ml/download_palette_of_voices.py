@@ -8,6 +8,8 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 import pandas as pd
 
@@ -25,6 +27,19 @@ def speaker_id(filename: str) -> str:
     if not match:
         raise ValueError(f"Palette of Voices filename has no documented speaker ID: {filename}")
     return match["speaker"]
+
+
+def direct_osf_file_url(download_url: str) -> str:
+    """Avoid the rate-limited UI redirect while retaining OSF's official file host."""
+    file_id = urlsplit(download_url).path.rstrip("/").split("/")[-1]
+    if not file_id:
+        raise ValueError(f"OSF download URL has no file ID: {download_url}")
+    if len(file_id) <= 5:
+        # Older OSF aliases resolve to a current storage ID; deriving the URL
+        # from the alias would produce a 404.
+        with urlopen(Request(download_url, method="HEAD"), timeout=30) as response:
+            return response.geturl()
+    return f"https://files.osf.io/v1/resources/{OSF_NODE}/providers/osfstorage/{file_id}"
 
 
 def verify_open_license() -> None:
@@ -69,13 +84,36 @@ def write_manifest(output: Path) -> None:
             )
 
 
+def expected_wav_files(summary: Path) -> set[str]:
+    rows = pd.read_excel(summary, sheet_name="Data")
+    if "fileName" not in rows:
+        raise ValueError("official perception summary is missing fileName")
+    return {f"{name}.wav" for name in rows["fileName"].dropna()}
+
+
+def download_rated_audio(download_url: str, destination: Path) -> None:
+    try:
+        download(direct_osf_file_url(download_url), destination)
+    except Exception as error:
+        raise RuntimeError(f"failed to download rated audio {destination.name}") from error
+
+
 def download_palette_of_voices(output: Path) -> None:
     verify_open_license()
     files = remote_files(ROOT_FILES)
-    selected = [file for file in files if file.relative_path.suffix.lower() == ".wav" or file.relative_path.name == SUMMARY_FILE]
+    summary_remote = next((file for file in files if file.relative_path.name == SUMMARY_FILE), None)
+    if summary_remote is None:
+        raise FileNotFoundError("official perception summary is absent from OSF")
+    summary_path = output / SUMMARY_FILE
+    download(direct_osf_file_url(summary_remote.download_url), summary_path)
+    expected = expected_wav_files(summary_path)
+    selected = [file for file in files if file.relative_path.name in expected]
+    if len(selected) != len(expected):
+        found = {file.relative_path.name for file in selected}
+        raise FileNotFoundError(f"OSF is missing {len(expected.difference(found))} rated audio files")
     # Keep OSF requests resumable while avoiding a long serial download.
     with ThreadPoolExecutor(max_workers=4) as executor:
-        list(executor.map(lambda remote: download(remote.download_url, output / remote.relative_path), selected))
+        list(executor.map(lambda remote: download_rated_audio(remote.download_url, output / remote.relative_path), selected))
     (output / "dataset-metadata.json").write_text(
         json.dumps(
             {
