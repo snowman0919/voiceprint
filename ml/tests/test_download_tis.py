@@ -11,6 +11,7 @@ class TisDownloadTests(unittest.TestCase):
     def test_filename_preserves_documented_speaker_and_intent_labels(self):
         self.assertEqual(parse_filename(Path("1893_wof_n01.wav")), ("1893", "neutral"))
         self.assertEqual(parse_filename(Path("1901_bof_t05.wav")), ("1901", "trustworthy"))
+        self.assertEqual(parse_filename(Path("1923_wom_t07c_version2.wav")), ("1923", "trustworthy"))
 
     def test_refuses_filename_without_the_official_metadata_contract(self):
         with self.assertRaisesRegex(ValueError, "speaker/intent"):

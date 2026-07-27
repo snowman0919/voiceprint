@@ -18,7 +18,7 @@ from urllib.request import Request, urlopen
 OSF_NODE = "45d8j"
 ROOT_FILES = f"https://api.osf.io/v2/nodes/{OSF_NODE}/files/osfstorage/"
 USER_AGENT = "Voiceprint-data-audit/0.1 (research dataset downloader)"
-FILENAME = re.compile(r"^(?P<speaker>\d+)_[a-z]+_(?P<intent>[nt])\d+[a-z]*\.wav$", re.IGNORECASE)
+FILENAME = re.compile(r"^(?P<speaker>\d+)_[a-z]+_(?P<intent>[nt])\d+[a-z]*(?:_version\d+)?\.wav$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
