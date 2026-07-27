@@ -41,7 +41,7 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number): AudioQualit
   const rms = Math.sqrt(sumSquares / Math.max(pcm.length, 1));
   const clippingRatio = clipped / Math.max(pcm.length, 1);
   const issues: string[] = [];
-  if (durationSeconds < 8) issues.push("유효 음성이 8초보다 짧습니다.");
+  if (durationSeconds < 7.99) issues.push("유효 음성이 8초보다 짧습니다.");
   if (rms < 0.01) issues.push("입력 음량이 너무 작습니다.");
   if (clippingRatio > 0.01) issues.push("clipping이 큽니다.");
   if (voicedFrames / Math.max(frameCount, 1) < 0.2) issues.push("유성음이 부족합니다.");

@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import type { AudioQuality } from "@/lib/audio-quality";
+import type { DspSummary } from "@/lib/dsp";
 
 type InputInfo = { sampleRate: number; durationSeconds: number; source: string };
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
@@ -16,6 +17,7 @@ export function Recorder() {
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
   const [quality, setQuality] = useState<AudioQuality>();
+  const [dsp, setDsp] = useState<DspSummary>();
   const [input, setInput] = useState<InputInfo>();
   const [message, setMessage] = useState<string>();
   const recorder = useRef<MediaRecorder | undefined>(undefined);
@@ -39,15 +41,16 @@ export function Recorder() {
   async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string) {
     setState("checking");
     try {
-      const result = await new Promise<AudioQuality>((resolve, reject) => {
+      const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary }>((resolve, reject) => {
         const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
         worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
         worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
         worker.postMessage({ pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
       });
-      setInput({ sampleRate, durationSeconds: result.durationSeconds, source });
-      setQuality(result);
-      setMessage(result.issues[0]);
+      setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source });
+      setQuality(result.quality);
+      setDsp(result.dsp);
+      setMessage(result.quality.issues[0]);
       setState("ready");
     } catch {
       setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
@@ -75,6 +78,7 @@ export function Recorder() {
   async function startRecording() {
     setMessage(undefined);
     setQuality(undefined);
+    setDsp(undefined);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -161,7 +165,7 @@ export function Recorder() {
       <label className="file"><span>또는 로컬 파일 선택</span><input accept="audio/*" onChange={selectFile} type="file" /></label>
       {state === "checking" && <p role="status">입력 품질 확인 중…</p>}
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
-      {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div></dl>}
+      {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{dsp?.f0MedianHz && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}</dl>}
       <button disabled={!canAnalyze} type="button">분석 시작</button>
       {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · 이 기기에서만 처리</p>}
     </section>

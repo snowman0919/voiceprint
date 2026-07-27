@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm --dir apps/web dev",
     "build": "pnpm build:wasm && pnpm --dir apps/web build",
-    "build:wasm": "wasm-pack build crates/voice-dsp --target web --out-dir ../../apps/web/public/wasm --release",
+    "build:wasm": "./scripts/build-wasm.sh",
     "lint": "pnpm --dir apps/web lint"
   }
 }

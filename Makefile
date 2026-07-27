@@ -1,7 +1,7 @@
 .PHONY: build-wasm test-wasm lint typecheck test-web build
 
 build-wasm:
-	wasm-pack build crates/voice-dsp --target web --out-dir ../../apps/web/public/wasm --release
+	./scripts/build-wasm.sh
 
 test-wasm:
 	cargo test -p voice-dsp

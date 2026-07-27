@@ -31,7 +31,7 @@ pub fn estimate_f0(frame: &[f32], sample_rate: f32) -> Option<f32> {
         return None;
     }
 
-    let mut best = (0usize, f32::NEG_INFINITY);
+    let mut correlations = Vec::with_capacity(max_lag - min_lag + 1);
     for lag in min_lag..=max_lag {
         let (mut numerator, mut left_energy, mut right_energy) = (0.0, 0.0, 0.0);
         for index in lag..centered.len() {
@@ -40,11 +40,19 @@ pub fn estimate_f0(frame: &[f32], sample_rate: f32) -> Option<f32> {
             right_energy += centered[index - lag] * centered[index - lag];
         }
         let correlation = numerator / (left_energy * right_energy).sqrt().max(1e-12);
-        if correlation > best.1 {
-            best = (lag, correlation);
-        }
+        correlations.push(correlation);
     }
-    (best.1 >= 0.65).then_some(sample_rate / best.0 as f32)
+    let first_period_peak = correlations
+        .windows(3)
+        .position(|window| window[1] >= 0.65 && window[1] >= window[0] && window[1] > window[2]);
+    if let Some(index) = first_period_peak {
+        return Some(sample_rate / (min_lag + index + 1) as f32);
+    }
+    let (index, correlation) = correlations
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| left.total_cmp(right))?;
+    (*correlation >= 0.65).then_some(sample_rate / (min_lag + index) as f32)
 }
 
 /// Calculates spectral features from the first Hann-windowed frame. Callers choose
@@ -109,6 +117,13 @@ pub fn estimate_f0_hz(frame: &[f32], sample_rate: f32) -> f32 {
     estimate_f0(frame, sample_rate).unwrap_or(f32::NAN)
 }
 
+#[wasm_bindgen]
+pub fn spectral_centroid_hz(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.centroid_hz)
+        .unwrap_or(f32::NAN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +138,13 @@ mod tests {
     fn tracks_a_known_pitch_without_a_narrow_demographic_range() {
         let frame = sine(220.0, 0.08, 24_000.0);
         let f0 = estimate_f0(&frame, 24_000.0).expect("periodic speech-like frame should have F0");
+        assert!((f0 - 220.0).abs() < 3.0, "expected 220Hz, got {f0}");
+    }
+
+    #[test]
+    fn avoids_halving_pitch_at_a_common_browser_sample_rate() {
+        let frame = sine(220.0, 0.08, 44_100.0);
+        let f0 = estimate_f0(&frame, 44_100.0).expect("periodic frame should have F0");
         assert!((f0 - 220.0).abs() < 3.0, "expected 220Hz, got {f0}");
     }
 
