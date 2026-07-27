@@ -8,8 +8,6 @@ import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal }
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
 import { encodeSharedResult } from "@/lib/share";
-import { cachedModel, loadManifest, type ModelEntry } from "@/lib/model-cache";
-import type { InferenceBackend } from "@/lib/inference";
 import { F0Contour } from "./f0-contour";
 import { Spectrogram } from "./spectrogram";
 
@@ -60,7 +58,6 @@ export function Recorder() {
   const pendingAudio = useRef<AudioBuffer | null>(null);
   const cancelWorker = useRef<(() => void) | undefined>(undefined);
   const [pendingRange, setPendingRange] = useState<PendingRange>();
-  const modelPcm = useRef<Float32Array | undefined>(undefined);
 
   useEffect(
     () => () => {
@@ -91,7 +88,6 @@ export function Recorder() {
     setState("checking");
     setAnalysisStage("input");
     setAnalysis(undefined);
-    modelPcm.current = pcm.slice();
     try {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>(
         (resolve, reject) => {
@@ -284,28 +280,6 @@ export function Recorder() {
     }
   }
 
-  async function inferTisIntent(pcm: Float32Array, sampleRate: number) {
-    const manifest = await loadManifest();
-    const model = manifest.models.find((entry) => entry.id === "tis-intent-v1");
-    if (!model || !(await cachedModel(model))) return undefined;
-    return new Promise<{ score: number; windows: number; backend: InferenceBackend; model: ModelEntry }>(
-      (resolve, reject) => {
-        const worker = new Worker(new URL("../../workers/model.worker.ts", import.meta.url));
-        worker.onmessage = ({ data }) => {
-          worker.terminate();
-          if (data.type === "tis-result")
-            resolve({ score: data.score, windows: data.windows, backend: data.backend, model });
-          else reject(new Error(data.message ?? "TIS 모델 추론을 시작할 수 없습니다."));
-        };
-        worker.onerror = () => {
-          worker.terminate();
-          reject(new Error("TIS 모델 추론을 시작할 수 없습니다."));
-        };
-        worker.postMessage({ type: "infer-tis", model, pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
-      },
-    );
-  }
-
   async function startAnalysis() {
     if (!input || !quality || !dsp) return;
     setShareUrl(undefined);
@@ -322,23 +296,7 @@ export function Recorder() {
       brand.dspVersion,
       practiceGoal,
     );
-    try {
-      const output = modelPcm.current ? await inferTisIntent(modelPcm.current, input.sampleRate) : undefined;
-      if (output) {
-        local.modelVersion = output.model.version;
-        local.modelOutputs = {
-          kind: "tis-trustworthy-intent",
-          score: output.score,
-          windows: output.windows,
-          backend: output.backend,
-          modelVersion: output.model.version,
-        };
-      }
-    } catch {
-      setMessage("학습 모델을 실행하지 못해 음향 측정 결과만 표시합니다.");
-    } finally {
-      setAnalysisStage(undefined);
-    }
+    setAnalysisStage(undefined);
     setAnalysis(local);
   }
 
@@ -554,11 +512,7 @@ export function Recorder() {
             <p className="eyebrow">결과</p>
             <h2 id="result-heading">측정된 음향 특징</h2>
           </div>
-          <p>
-            {analysis.modelOutputs
-              ? "아래에는 로컬 음향 측정과 제한된 녹음 조건 모델 결과를 함께 표시합니다."
-              : "학습 모델을 사용할 수 없어 아래는 규칙 기반의 로컬 음향 측정입니다."}
-          </p>
+          <p>아래는 이 녹음에서 관측한 음향 특징과 사전 정의한 규칙 기반 인상 지표입니다.</p>
           <section aria-label="측정 기반 음향 경향" className="model-result">
             <h3>측정 기반 음향 경향</h3>
             <p>확률이나 개인 특성 판단이 아닌, 이 녹음에서 측정한 상대 지표입니다.</p>
@@ -579,19 +533,6 @@ export function Recorder() {
               위한 친숙한 표현입니다.
             </p>
           </section>
-          {analysis.modelOutputs?.kind === "tis-trustworthy-intent" && (
-            <section aria-label="TIS 모델 결과" className="model-result">
-              <h3>녹음 조건 모델</h3>
-              <p>
-                신뢰감을 의도한 발화 조건 경향 {analysis.modelOutputs.score}/100 · {analysis.modelOutputs.windows}개
-                구간 평균 · {analysis.modelOutputs.backend === "webgpu" ? "GPU" : "CPU/WASM"}
-              </p>
-              <p>
-                이는 TIS 영어 연구 데이터에서 화자가 신뢰감을 의도한 조건과 중립 조건을 구분한 제한적 모델입니다. 사람의
-                실제 신뢰성·성격·의도를 판정하지 않습니다.
-              </p>
-            </section>
-          )}
           <dl className="quality">
             <div>
               <dt>F0 중앙값</dt>

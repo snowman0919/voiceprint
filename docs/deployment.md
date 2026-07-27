@@ -1,14 +1,13 @@
 # Deployment
 
-Create the local model artifact, then build the production image:
+Build the acoustic-measurement static image:
 
 ```sh
-make data-tis data-tis-audit split-tis train-tis sync-tis-model
 make docker-build
 docker run --rm -p 8080:8080 voiceprint:local
 ```
 
-`sync-tis-model` is intentionally a local release step: it creates the ignored ONNX asset, rewrites the static model manifest with its SHA-256, then verifies the URL, file size, and digest against exact local bytes. Do not build a release image with a manifest that refers to absent model bytes. The source checkout's empty manifest remains valid for the acoustic-measurement-only mode.
+`sync-tis-model` remains a local ONNX-pipeline regression command: it creates an ignored TIS artifact and verifies its URL, file size, and digest against exact local bytes. Do not include that model in a user report or release manifest: its trustworthy-intent recording-condition label does not validate this product's voice-expression report. The source checkout's empty manifest is the supported release state until a purpose-specific, consented multi-rater model is available.
 
 The image builds Rust/WASM and Next static export in separate build stages. Its runtime stage contains Nginx and exported assets only: no Node.js, Python, training data, Kaggle credentials, checkpoints, or Rust compiler. The optional generated ONNX static asset is the only model-related runtime file.
 

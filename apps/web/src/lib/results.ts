@@ -1,6 +1,5 @@
 import type { AudioQuality } from "./audio-quality";
 import type { DspSummary } from "./dsp";
-import type { InferenceBackend } from "./inference";
 
 export const practiceGoals = [
   "clarity",
@@ -25,13 +24,7 @@ export type LocalAnalysis = {
   acousticFeatures: DspSummary;
   voiceImpression: VoiceImpressionSpectrum;
   acousticSummary: AcousticTendency[];
-  modelOutputs: null | {
-    kind: "tis-trustworthy-intent";
-    score: number;
-    windows: number;
-    backend: InferenceBackend;
-    modelVersion: string;
-  };
+  modelOutputs: null;
   practiceGoal: PracticeGoal;
   recommendations: string[];
 };
@@ -164,7 +157,6 @@ export function scalarCsv(result: LocalAnalysis) {
     midBandEnergyRatio: result.acousticFeatures.midBandEnergyRatio ?? "",
     highBandEnergyRatio: result.acousticFeatures.highBandEnergyRatio ?? "",
     hnrDb: result.acousticFeatures.hnrDb ?? "",
-    tisTrustworthyIntentScore: result.modelOutputs?.kind === "tis-trustworthy-intent" ? result.modelOutputs.score : "",
   };
   return `${Object.keys(values).join(",")}\n${Object.values(values).join(",")}\n`;
 }

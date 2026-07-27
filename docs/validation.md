@@ -6,7 +6,7 @@
 - Python tests reject unlabeled/unsafe data routes and speaker leakage in deterministic split assignment.
 - Browser unit tests prevent PCM/waveform fields from downloads and share payloads, and validate ONNX WebGPU→WASM fallback ordering.
 - Playwright loads a real local WAV, renders the actual Worker/WASM waveform and log-power spectrogram, and asserts that no POST/PUT/PATCH request is made and every observed request remains on the local static origin.
-- A model-injected local build additionally warms the hash-verified TIS ONNX model, renders its bounded recording-condition result, and retains the same no-external-request assertion.
+- A model-injected local build may warm the hash-verified TIS ONNX pipeline, retains the same no-external-request assertion, and verifies that the baseline does not appear in the user report.
 - CI builds the static export, installs Chromium for the browser flow, and builds the multi-stage Docker image.
 
 ## DSP benchmark
