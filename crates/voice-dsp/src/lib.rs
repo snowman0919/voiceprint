@@ -6,6 +6,47 @@ use wasm_bindgen::prelude::*;
 const MIN_F0_HZ: f32 = 50.0;
 const MAX_F0_HZ: f32 = 700.0;
 
+/// Windowed-sinc mono resampler. The cutoff follows the lower Nyquist limit so
+/// downsampling does not fold high-frequency energy into speech features.
+pub fn resample_bandlimited(input: &[f32], source_rate: f32, target_rate: f32) -> Vec<f32> {
+    if input.is_empty() || source_rate <= 0.0 || target_rate <= 0.0 {
+        return Vec::new();
+    }
+    if (source_rate - target_rate).abs() < f32::EPSILON {
+        return input.to_vec();
+    }
+    let ratio = target_rate / source_rate;
+    let output_len = (input.len() as f32 * ratio).round() as usize;
+    let cutoff = ratio.min(1.0) * 0.95;
+    const HALF_TAPS: isize = 16;
+    (0..output_len)
+        .map(|output_index| {
+            let position = output_index as f32 / ratio;
+            let center = position.floor() as isize;
+            let (mut sum, mut normalization) = (0.0, 0.0);
+            for tap in -HALF_TAPS + 1..=HALF_TAPS {
+                let index = center + tap;
+                if !(0..input.len() as isize).contains(&index) {
+                    continue;
+                }
+                let distance = position - index as f32;
+                let sinc = if distance.abs() < 1e-6 {
+                    cutoff
+                } else {
+                    (core::f32::consts::PI * cutoff * distance).sin()
+                        / (core::f32::consts::PI * distance)
+                };
+                let window =
+                    0.5 + 0.5 * (core::f32::consts::PI * distance / HALF_TAPS as f32).cos();
+                let coefficient = sinc * window;
+                sum += input[index as usize] * coefficient;
+                normalization += coefficient;
+            }
+            sum / normalization.max(1e-12)
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpectralFeatures {
     pub centroid_hz: f32,
@@ -147,6 +188,11 @@ pub fn hnr_db(frame: &[f32], sample_rate: f32) -> f32 {
     harmonic_to_noise_ratio_db(frame, sample_rate).unwrap_or(f32::NAN)
 }
 
+#[wasm_bindgen]
+pub fn resample_to_24khz(samples: &[f32], source_rate: f32) -> Vec<f32> {
+    resample_bandlimited(samples, source_rate, 24_000.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,5 +243,25 @@ mod tests {
             .map(|index| ((index * 7 % 17) as f32 / 8.0) - 1.0)
             .collect::<Vec<_>>();
         assert_eq!(harmonic_to_noise_ratio_db(&noise, 24_000.0), None);
+    }
+
+    #[test]
+    fn downsampling_preserves_speech_band_tone_and_rejects_alias_energy() {
+        let speech_band = sine(1_000.0, 0.12, 48_000.0);
+        let downsampled = resample_bandlimited(&speech_band, 48_000.0, 24_000.0);
+        let spectrum = spectral_features(&downsampled[..1024], 24_000.0, 1024)
+            .expect("resampled tone has spectrum");
+        assert!(
+            (spectrum.centroid_hz - 1_000.0).abs() < 70.0,
+            "speech-band frequency drifted: {}",
+            spectrum.centroid_hz
+        );
+
+        let out_of_band = sine(18_000.0, 0.12, 48_000.0);
+        let filtered = resample_bandlimited(&out_of_band, 48_000.0, 24_000.0);
+        let rms = (filtered.iter().map(|sample| sample * sample).sum::<f32>()
+            / filtered.len() as f32)
+            .sqrt();
+        assert!(rms < 0.15, "out-of-band signal aliased into output: {rms}");
     }
 }
