@@ -32,6 +32,9 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> float:
@@ -47,10 +50,18 @@ def train(config: dict[str, object], manifest: Path, data_root: Path, output: Pa
     set_seed(int(config["seed"]))
     device = select_device(str(config["device"]))
     spec = DatasetSpec(manifest, data_root, int(config["sample_rate"]), int(config["input_seconds"]))
-    train_set, validation_set = WaveformDataset(spec, "train"), WaveformDataset(spec, "validation")
+    train_set = WaveformDataset(spec, "train")
+    validation_set = WaveformDataset(spec, "validation")
+    test_set = WaveformDataset(spec, "test")
     loader_options = {"batch_size": int(config["batch_size"]), "num_workers": int(config["num_workers"]), "pin_memory": device.type == "cuda"}
-    train_loader = DataLoader(train_set, shuffle=True, **loader_options)
+    train_loader = DataLoader(
+        train_set,
+        shuffle=True,
+        generator=torch.Generator().manual_seed(int(config["seed"])),
+        **loader_options,
+    )
     validation_loader = DataLoader(validation_set, shuffle=False, **loader_options)
+    test_loader = DataLoader(test_set, shuffle=False, **loader_options)
     model = VoiceImpressionNet().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(config["learning_rate"]), weight_decay=float(config["weight_decay"]))
     best_loss = float("inf")
@@ -67,6 +78,12 @@ def train(config: dict[str, object], manifest: Path, data_root: Path, output: Pa
         if validation_loss < best_loss:
             best_loss = validation_loss
             torch.save({"state_dict": model.state_dict(), "config": config, "validation_loss": best_loss}, output)
+    checkpoint = torch.load(output, map_location=device, weights_only=True)
+    model.load_state_dict(checkpoint["state_dict"])
+    test_loss = evaluate(model, test_loader, device)
+    metrics = {"validation_loss": best_loss, "test_loss": test_loss, "device": str(device), "seed": int(config["seed"])}
+    output.with_suffix(".metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    print(json.dumps(metrics))
 
 
 def main() -> None:

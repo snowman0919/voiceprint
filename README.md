@@ -57,6 +57,8 @@ make split
 
 감사는 license와 파일 형식을 검사합니다. `scalar_only` 데이터는 waveform CNN/hybrid 학습으로 진입할 수 없으며, speaker ID 없는 데이터는 speaker-disjoint split을 만들 수 없습니다. 모델 라벨과 사용자가 지각한 음성 인상은 동일하지 않습니다.
 
+승인된 데이터가 준비된 뒤의 결정론적 학습·held-out 평가·ONNX export 절차는 [docs/training.md](docs/training.md)를 따릅니다.
+
 ## Docker
 
 ```sh
