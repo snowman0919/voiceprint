@@ -4,7 +4,8 @@
   "packageManager": "pnpm@11.17.0",
   "scripts": {
     "dev": "pnpm --dir apps/web dev",
-    "build": "pnpm --dir apps/web build",
+    "build": "pnpm build:wasm && pnpm --dir apps/web build",
+    "build:wasm": "wasm-pack build crates/voice-dsp --target web --out-dir ../../apps/web/public/wasm --release",
     "lint": "pnpm --dir apps/web lint"
   }
 }

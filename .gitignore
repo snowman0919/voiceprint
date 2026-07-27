@@ -14,3 +14,4 @@ artifacts/
 kaggle.json
 .DS_Store
 .playwright-cli/
+apps/web/public/wasm/
