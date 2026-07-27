@@ -18,7 +18,7 @@ import numpy as np
 import torch
 from scipy.io import wavfile
 from scipy.signal import resample_poly
-from sklearn.metrics import average_precision_score, balanced_accuracy_score, roc_auc_score
+from sklearn.metrics import average_precision_score, balanced_accuracy_score, f1_score, roc_auc_score
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
@@ -58,6 +58,24 @@ def set_seed(seed: int) -> None:
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
     torch.use_deterministic_algorithms(True, warn_only=True)
+
+
+def expected_calibration_error(probabilities: list[float], targets: list[float], bins: int = 10) -> float:
+    """Equal-width ECE for a binary model; empty bins do not change the score."""
+    if len(probabilities) != len(targets) or not probabilities or bins < 1:
+        raise ValueError("calibration requires equally sized non-empty predictions and targets")
+    scores = np.asarray(probabilities, dtype=np.float64)
+    labels = np.asarray(targets, dtype=np.float64)
+    if np.any(~np.isfinite(scores)) or np.any((scores < 0) | (scores > 1)) or np.any(~np.isfinite(labels)):
+        raise ValueError("calibration inputs must be finite probabilities")
+    total = len(scores)
+    error = 0.0
+    for index in range(bins):
+        lower, upper = index / bins, (index + 1) / bins
+        selected = (scores >= lower) & (scores < upper if index < bins - 1 else scores <= upper)
+        if selected.any():
+            error += selected.mean() * abs(scores[selected].mean() - labels[selected].mean())
+    return float(error)
 
 
 def waveform_from_wav(path: Path, sample_rate: int, samples: int) -> torch.Tensor:
@@ -140,6 +158,8 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> tupl
         "auroc": float(roc_auc_score(targets, probabilities)),
         "average_precision": float(average_precision_score(targets, probabilities)),
         "balanced_accuracy": float(balanced_accuracy_score(targets, predicted)),
+        "macro_f1": float(f1_score(targets, predicted, average="macro")),
+        "expected_calibration_error": expected_calibration_error(probabilities, targets),
     }, probabilities, targets
 
 

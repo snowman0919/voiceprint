@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from voiceprint_ml.tis_model import TisIntentNet, TisDataset
+from voiceprint_ml.tis_model import TisIntentNet, TisDataset, expected_calibration_error
 
 
 class TisModelTests(unittest.TestCase):
@@ -28,6 +28,10 @@ b.wav,speaker,trustworthy,test
             )
             with self.assertRaisesRegex(ValueError, "leaks speaker IDs"):
                 TisDataset(manifest, Path(directory), "train", 16_000, 4)
+
+    def test_calibration_error_separates_aligned_and_miscalibrated_scores(self):
+        self.assertAlmostEqual(expected_calibration_error([0.1, 0.9], [0.0, 1.0]), 0.1)
+        self.assertGreater(expected_calibration_error([0.9, 0.1], [0.0, 1.0]), 0.8)
 
 
 if __name__ == "__main__":

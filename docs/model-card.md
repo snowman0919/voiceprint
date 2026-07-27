@@ -4,7 +4,7 @@
 
 `make train-tis` trains a local TIS v1 model, and `make sync-tis-model` exports a browser-ready ONNX artifact and creates its SHA-256 manifest. Checkpoints, source audio, and generated ONNX files are intentionally excluded from Git. A release/deployment build must run these commands before the static Next.js build.
 
-The recorded local run used Apple Metal with seed `20260728`. It selected epoch 5 by validation AUROC. On the held-out 10-speaker test partition (120 clips), it measured AUROC 0.814, average precision 0.809, and balanced accuracy 0.667 at the fixed 0.5 threshold. ONNX Runtime CPU output matched PyTorch with a maximum absolute error of `7.99e-9` for the deterministic parity input.
+The recorded local run used Apple Metal with seed `20260728`. It selected epoch 5 by validation AUROC. On the held-out 10-speaker test partition (120 clips), it measured AUROC 0.814, average precision 0.809, balanced accuracy 0.667 at the fixed 0.5 threshold, macro F1 0.644, and 10-bin expected calibration error 0.149. ONNX Runtime CPU output matched PyTorch with a maximum absolute error of `7.99e-9` for the deterministic parity input.
 
 The exported fixed four-second model has 163,369 parameters and a 658,960-byte ONNX artifact. In the recorded local CPU validation, mean warm ONNX Runtime CPU inference was 0.82 ms across 20 runs. This is a native CPU measurement, not a WebGPU, WASM, or mobile-browser claim.
 
