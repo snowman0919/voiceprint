@@ -1,4 +1,11 @@
-.PHONY: build-wasm test-wasm lint typecheck test-web test-e2e test-python data-kaggle data-audit docker-build docker-run build
+.PHONY: setup dev build-wasm test-wasm lint typecheck test test-web test-e2e test-python data-kaggle data-audit docker-build docker-run verify build
+
+setup:
+	pnpm install --frozen-lockfile
+	uv sync --project ml
+
+dev:
+	pnpm dev
 
 build-wasm:
 	./scripts/build-wasm.sh
@@ -18,6 +25,8 @@ test-web:
 test-e2e:
 	pnpm --dir apps/web test:e2e
 
+test: test-wasm test-python test-web test-e2e
+
 test-python:
 	PYTHONPATH=ml python3 -m unittest discover -s ml/tests
 
@@ -35,6 +44,8 @@ docker-build:
 
 docker-run:
 	docker run --rm --publish 8080:8080 voiceprint:local
+
+verify: lint typecheck test docker-build
 
 build: build-wasm
 	pnpm --dir apps/web build
