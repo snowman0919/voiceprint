@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -21,6 +22,12 @@ class DatasetAudit:
     sample_columns: list[str]
     metadata_license: str | None
     file_sha256: dict[str, str]
+    duplicate_files: list[list[str]]
+    wav_sample_rates: dict[str, int]
+    wav_channels: dict[str, int]
+    wav_duration_seconds: dict[str, float]
+    unreadable_audio: list[str]
+    label_balance: dict[str, int]
     trainable_waveform: bool
     blockers: list[str]
 
@@ -44,6 +51,29 @@ def _metadata_license(root: Path) -> str | None:
     return payload.get("licenseName") or payload.get("license")
 
 
+def _wav_metadata(path: Path) -> tuple[int, int, float]:
+    with wave.open(str(path), "rb") as source:
+        return source.getframerate(), source.getnchannels(), source.getnframes() / source.getframerate()
+
+
+def _label_balance(path: Path | None) -> dict[str, int]:
+    if not path:
+        return {}
+    try:
+        with path.open(encoding="utf-8", newline="") as source:
+            rows = csv.DictReader(source)
+            if not rows.fieldnames or "label" not in rows.fieldnames:
+                return {}
+            counts: dict[str, int] = {}
+            for row in rows:
+                label = row.get("label")
+                if label:
+                    counts[label] = counts.get(label, 0) + 1
+            return counts
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return {}
+
+
 def audit_dataset(root: Path) -> DatasetAudit:
     files = [path for path in root.rglob("*") if path.is_file()]
     audio_files = [path for path in files if path.suffix.lower() in AUDIO_SUFFIXES]
@@ -65,7 +95,30 @@ def audit_dataset(root: Path) -> DatasetAudit:
     else:
         kind = "unknown"
         blockers.append("No supported audio or tabular files found.")
-    hashes = {str(path.relative_to(root)): _sha256(path) for path in files if path.suffix.lower() in AUDIO_SUFFIXES}
+    hashes = {str(path.relative_to(root)): _sha256(path) for path in audio_files}
+    by_hash: dict[str, list[str]] = {}
+    for relative, digest in hashes.items():
+        by_hash.setdefault(digest, []).append(relative)
+    duplicates = [paths for paths in by_hash.values() if len(paths) > 1]
+    sample_rates: dict[str, int] = {}
+    channels: dict[str, int] = {}
+    durations: dict[str, float] = {}
+    unreadable: list[str] = []
+    for path in audio_files:
+        if path.suffix.lower() != ".wav":
+            continue
+        relative = str(path.relative_to(root))
+        try:
+            rate, channel_count, duration = _wav_metadata(path)
+            sample_rates[str(rate)] = sample_rates.get(str(rate), 0) + 1
+            channels[str(channel_count)] = channels.get(str(channel_count), 0) + 1
+            durations[relative] = duration
+        except (EOFError, OSError, wave.Error):
+            unreadable.append(relative)
+    if duplicates:
+        blockers.append("Duplicate audio content found; resolve it before speaker-disjoint splitting.")
+    if unreadable:
+        blockers.append("Unreadable WAV files found; training is blocked.")
     return DatasetAudit(
         root=str(root),
         kind=kind,
@@ -74,7 +127,13 @@ def audit_dataset(root: Path) -> DatasetAudit:
         sample_columns=columns,
         metadata_license=license_name,
         file_sha256=hashes,
-        trainable_waveform=kind == "raw_audio" and bool(license_name),
+        duplicate_files=duplicates,
+        wav_sample_rates=sample_rates,
+        wav_channels=channels,
+        wav_duration_seconds=durations,
+        unreadable_audio=unreadable,
+        label_balance=_label_balance(csv_file),
+        trainable_waveform=kind == "raw_audio" and bool(license_name) and not duplicates and not unreadable,
         blockers=blockers,
     )
 
