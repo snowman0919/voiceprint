@@ -138,25 +138,39 @@ fn lpc_envelope_peaks(coefficients: &[f32], sample_rate: f32, ceiling_hz: f32) -
         .map(|bin| {
             let frequency = bin as f32 * sample_rate / BINS as f32;
             let omega = 2.0 * core::f32::consts::PI * frequency / sample_rate;
-            let (real, imaginary) = coefficients.iter().enumerate().fold((0.0, 0.0), |(real, imaginary), (index, coefficient)| {
-                (real + coefficient * (omega * index as f32).cos(), imaginary - coefficient * (omega * index as f32).sin())
-            });
+            let (real, imaginary) = coefficients.iter().enumerate().fold(
+                (0.0, 0.0),
+                |(real, imaginary), (index, coefficient)| {
+                    (
+                        real + coefficient * (omega * index as f32).cos(),
+                        imaginary - coefficient * (omega * index as f32).sin(),
+                    )
+                },
+            );
             1.0 / (real * real + imaginary * imaginary).max(1e-12)
         })
         .collect::<Vec<_>>();
+    let maximum_power = powers.iter().copied().fold(0.0_f32, f32::max);
     let mut candidates = powers
         .windows(3)
         .enumerate()
         .filter_map(|(index, values)| {
             let bin = index + 1;
             let frequency = bin as f32 * sample_rate / BINS as f32;
-            (frequency >= 90.0 && values[1] > values[0] && values[1] >= values[2]).then_some((frequency, values[1]))
+            (frequency >= 150.0
+                && values[1] >= maximum_power * 0.03
+                && values[1] > values[0]
+                && values[1] >= values[2])
+                .then_some((frequency, values[1]))
         })
         .collect::<Vec<_>>();
-    candidates.sort_by(|left, right| right.1.total_cmp(&left.1));
+    candidates.sort_by(|left, right| left.0.total_cmp(&right.0));
     let mut selected: Vec<(f32, f32)> = Vec::new();
     for candidate in candidates {
-        if selected.iter().all(|(frequency, _)| (candidate.0 - frequency).abs() >= 140.0) {
+        if selected
+            .iter()
+            .all(|(frequency, _)| (candidate.0 - frequency).abs() >= 140.0)
+        {
             selected.push(candidate);
         }
         if selected.len() == 3 {
@@ -167,6 +181,23 @@ fn lpc_envelope_peaks(coefficients: &[f32], sample_rate: f32, ceiling_hz: f32) -
     selected
 }
 
+fn complete_formant_features(
+    peaks: &[(f32, f32)],
+    residual_ratio: f32,
+    ceiling_hz: f32,
+) -> Option<FormantFeatures> {
+    let [f1, f2, f3] = peaks else {
+        return None;
+    };
+    Some(FormantFeatures {
+        f1_hz: f1.0,
+        f2_hz: f2.0,
+        f3_hz: f3.0,
+        residual_ratio,
+        ceiling_hz,
+    })
+}
+
 /// Evaluates several formant ceilings and returns only a complete, ordered
 /// three-formant path.  Missing or unstable candidates remain unavailable.
 pub fn estimate_formants(frame: &[f32], sample_rate: f32) -> Option<FormantFeatures> {
@@ -175,20 +206,16 @@ pub fn estimate_formants(frame: &[f32], sample_rate: f32) -> Option<FormantFeatu
     }
     let order = ((sample_rate / 1_000.0).round() as usize * 2).clamp(10, 24);
     let (coefficients, residual_ratio) = burg_lpc(frame, order)?;
-    [4_500.0, 5_000.0, 5_500.0, 6_000.0, 6_500.0, 7_000.0, 8_000.0]
-        .into_iter()
-        .filter(|ceiling| *ceiling < sample_rate * 0.5 - 100.0)
-        .filter_map(|ceiling_hz| {
-            let peaks = lpc_envelope_peaks(&coefficients, sample_rate, ceiling_hz);
-            (peaks.len() == 3).then_some(FormantFeatures {
-                f1_hz: peaks[0].0,
-                f2_hz: peaks[1].0,
-                f3_hz: peaks[2].0,
-                residual_ratio,
-                ceiling_hz,
-            })
-        })
-        .min_by(|left, right| left.residual_ratio.total_cmp(&right.residual_ratio))
+    [
+        4_500.0, 5_000.0, 5_500.0, 6_000.0, 6_500.0, 7_000.0, 8_000.0,
+    ]
+    .into_iter()
+    .filter(|ceiling| *ceiling < sample_rate * 0.5 - 100.0)
+    .filter_map(|ceiling_hz| {
+        let peaks = lpc_envelope_peaks(&coefficients, sample_rate, ceiling_hz);
+        complete_formant_features(&peaks, residual_ratio, ceiling_hz)
+    })
+    .min_by(|left, right| left.residual_ratio.total_cmp(&right.residual_ratio))
 }
 
 /// Produces a time-major Hann-windowed log-power spectrogram. When the source
@@ -225,7 +252,8 @@ pub fn log_power_spectrogram(
         let mut bins = vec![Complex32::new(0.0, 0.0); fft_size];
         for (index, bin) in bins.iter_mut().take(frame_size).enumerate() {
             let window = 0.5
-                - 0.5 * (2.0 * core::f32::consts::PI * index as f32 / (frame_size - 1) as f32).cos();
+                - 0.5
+                    * (2.0 * core::f32::consts::PI * index as f32 / (frame_size - 1) as f32).cos();
             bin.re = samples[offset + index] * window;
         }
         fft.process(&mut bins);
@@ -553,7 +581,9 @@ mod tests {
     fn stft_silence_has_finite_epsilon_floored_values() {
         let spectrum = log_power_spectrogram(&vec![0.0; 1_024], 600, 1_024, 240, 8);
         assert!(
-            spectrum.iter().all(|value| value.is_finite() && *value <= -11.9),
+            spectrum
+                .iter()
+                .all(|value| value.is_finite() && *value <= -11.9),
             "silence must not generate NaN/Inf or false energy"
         );
     }
@@ -592,11 +622,33 @@ mod tests {
     #[test]
     fn burg_lpc_recovers_ordered_resonance_peaks_without_inventing_silence_formants() {
         let frame = resonant_signal(&[500.0, 1_500.0, 2_500.0], 0.08, 24_000.0);
-        let formants = estimate_formants(&frame, 24_000.0).expect("three synthetic resonances should produce a complete LPC path");
-        assert!((formants.f1_hz - 500.0).abs() < 180.0, "unexpected F1: {}", formants.f1_hz);
-        assert!((formants.f2_hz - 1_500.0).abs() < 220.0, "unexpected F2: {}", formants.f2_hz);
-        assert!((formants.f3_hz - 2_500.0).abs() < 260.0, "unexpected F3: {}", formants.f3_hz);
+        let formants = estimate_formants(&frame, 24_000.0)
+            .expect("three synthetic resonances should produce a complete LPC path");
+        assert!(
+            (formants.f1_hz - 500.0).abs() < 180.0,
+            "unexpected F1: {}",
+            formants.f1_hz
+        );
+        assert!(
+            (formants.f2_hz - 1_500.0).abs() < 220.0,
+            "unexpected F2: {}",
+            formants.f2_hz
+        );
+        assert!(
+            (formants.f3_hz - 2_500.0).abs() < 260.0,
+            "unexpected F3: {}",
+            formants.f3_hz
+        );
         assert!(formants.f1_hz < formants.f2_hz && formants.f2_hz < formants.f3_hz);
         assert_eq!(estimate_formants(&vec![0.0; 1_920], 24_000.0), None);
+    }
+
+    #[test]
+    fn incomplete_lpc_peak_set_is_unavailable_not_a_runtime_failure() {
+        assert_eq!(
+            complete_formant_features(&[(500.0, 1.0), (1_500.0, 0.7)], 0.2, 5_500.0),
+            None,
+            "real speech can contain a partial peak set; it must not index missing F3"
+        );
     }
 }
