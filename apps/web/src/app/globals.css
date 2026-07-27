@@ -24,6 +24,10 @@ body {
 button {
   font-size: inherit;
 }
+:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
 .recorder {
   display: grid;
   gap: 16px;
@@ -211,4 +215,22 @@ button {
 }
 .downloads button {
   background: #2b7a78;
+}
+@media (max-width: 600px) {
+  body {
+    padding: 20px;
+  }
+  .quality {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
