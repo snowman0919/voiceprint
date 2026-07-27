@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-palette data-audit data-tis-audit data-palette-audit split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-model-manifest validate-formants sync-model sync-tis-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-palette data-audit data-tis-audit data-palette-audit features split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-model-manifest validate-formants sync-model sync-tis-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -56,6 +56,9 @@ data-tis-audit:
 
 data-palette-audit:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.data_audit ml/data/palette-of-voices --output ml/data/palette-of-voices/audit.json
+
+features:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.extract_features ml/data/approved/manifest.csv --data-root ml/data/approved --output ml/data/approved/features.parquet
 
 split:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv

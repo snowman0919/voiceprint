@@ -6,6 +6,7 @@ The repository distributes no training data or checkpoint. Run `make setup` firs
 make setup
 make data-audit
 PYTHONPATH=ml python -m voiceprint_ml.split approved-manifest.csv ml/data/approved/manifest.csv
+make features
 make train
 make export-onnx
 make validate-onnx
@@ -13,6 +14,8 @@ make model-manifest
 ```
 
 `ml/configs/train.json` uses fixed 16 kHz, 20-second mono inputs, batch size 8, AdamW, and a fixed seed. `device: auto` selects CUDA first (including an RTX 3080), then Apple MPS, then CPU. CUDA disables cuDNN benchmarking and enables deterministic selection where supported; PyTorch deterministic algorithms run in warning mode so unsupported operations are visible in logs rather than silently changing the run.
+
+`make features` writes an ignored Parquet cache for an approved speaker manifest. It records duration, sample rate, RMS, peak, clipping ratio, zero-crossing rate, and DC offset from the original PCM; it does not create labels or bypass the speaker-disjoint training gate.
 
 The best validation checkpoint is saved locally under `ml/checkpoints/` (ignored by Git). After training it is reloaded for a one-time untouched test-split loss, written beside it as `.metrics.json`. Do not add a model to the web manifest until the model card records the data audit, held-out metrics, ONNX parity, hash, and known limitations.
 
