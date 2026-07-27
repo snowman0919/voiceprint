@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { allowsAutoDownload, cachedModel, cachedModelBytes, downloadAndVerify, loadManifest, type ModelEntry } from "@/lib/model-cache";
-import { createOnDeviceSession, type InferenceBackend } from "@/lib/inference";
+import { createOnDeviceSession, warmUpOnDeviceSession, type InferenceBackend } from "@/lib/inference";
 
 type Status = "loading" | "unavailable" | "ready" | "downloading" | "error";
 
@@ -16,6 +16,7 @@ export function ModelStatus() {
 
   const startLocalSession = useCallback(async (active: ModelEntry) => {
     const result = await createOnDeviceSession(await cachedModelBytes(active));
+    await warmUpOnDeviceSession(result, active.inputSampleRate, active.inputSeconds);
     setBackend(result.backend);
   }, []);
 
