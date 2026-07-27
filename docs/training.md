@@ -1,6 +1,6 @@
 # Training
 
-The repository distributes no training data or checkpoint. Before any run, audit a licensed dataset, resolve duplicate audio, and produce a speaker-disjoint `train`/`validation`/`test` manifest. The training loader rejects sensitive identity/biological labels and refuses a missing held-out split.
+The repository distributes no training data or checkpoint. Run `make setup` first: ML commands use the lockfile-managed `uv` environment rather than a globally installed Python. Before any run, audit a licensed dataset, resolve duplicate audio, and produce a speaker-disjoint `train`/`validation`/`test` manifest. The training loader rejects sensitive identity/biological labels and refuses a missing held-out split.
 
 ```sh
 make setup

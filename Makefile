@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile lint typecheck test test-web test-e2e test-python data-kaggle data-audit docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-audit split train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -40,25 +40,29 @@ test-python:
 	PYTHONPATH=ml python3 -m unittest discover -s ml/tests
 
 data-kaggle:
-	PYTHONPATH=ml python3 -m voiceprint_ml.download_kaggle --output ml/data/kaggle
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.download_kaggle --output ml/data/kaggle
 
 data-audit:
-	PYTHONPATH=ml python3 -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json
 
 split:
-	PYTHONPATH=ml python3 -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv
 
 train:
-	PYTHONPATH=ml python3 -m voiceprint_ml.train --manifest ml/data/approved/manifest.csv --data-root ml/data/approved
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.train --manifest ml/data/approved/manifest.csv --data-root ml/data/approved
 
 export-onnx:
-	PYTHONPATH=ml python3 -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
 
 model-manifest:
-	PYTHONPATH=ml python3 -m voiceprint_ml.create_manifest apps/web/public/models/voice-impression-v1.onnx --version 1.0.0 --quantization int8-dynamic
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.create_manifest apps/web/public/models/voice-impression-v1.onnx --version 1.0.0 --quantization int8-dynamic
 
 validate-onnx:
-	PYTHONPATH=ml python3 -m voiceprint_ml.validate_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.validate_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
+
+sync-model: validate-onnx model-manifest
+
+benchmark: benchmark-dsp
 
 docker-build:
 	docker build --tag voiceprint:local .

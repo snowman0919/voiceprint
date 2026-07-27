@@ -47,7 +47,7 @@ make lint typecheck test-wasm test-python test-web test-e2e build
 
 ## 데이터와 학습
 
-기본 후보 데이터셋은 Kaggle `murtadhanajim/gender-recognition-by-voiceoriginal`입니다. `KAGGLE_API_TOKEN`, legacy `KAGGLE_USERNAME`/`KAGGLE_KEY`, 또는 로컬 Kaggle credential을 설정한 뒤 다음을 실행합니다.
+기본 후보 데이터셋은 Kaggle `murtadhanajim/gender-recognition-by-voiceoriginal`입니다. 먼저 `make setup`으로 잠금된 Python 환경과 Kaggle CLI를 설치한 뒤, `KAGGLE_API_TOKEN`, legacy `KAGGLE_USERNAME`/`KAGGLE_KEY`, 또는 로컬 Kaggle credential을 설정하고 다음을 실행합니다.
 
 ```sh
 make data-kaggle
