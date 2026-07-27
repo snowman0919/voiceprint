@@ -1,5 +1,6 @@
 packages:
   - apps/*
 allowBuilds:
+  protobufjs: false
   sharp: true
   unrs-resolver: true

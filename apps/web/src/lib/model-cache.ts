@@ -20,6 +20,12 @@ export async function cachedModel(model: ModelEntry) {
   return (await caches.open(cacheName)).match(model.url);
 }
 
+export async function cachedModelBytes(model: ModelEntry) {
+  const response = await cachedModel(model);
+  if (!response) throw new Error("검증된 로컬 모델이 없습니다.");
+  return response.arrayBuffer();
+}
+
 export async function clearModelCache() { await caches.delete(cacheName); }
 
 function hex(bytes: ArrayBuffer) { return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join(""); }
