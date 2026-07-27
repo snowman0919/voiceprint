@@ -39,6 +39,12 @@ data-audit:
 split:
 	PYTHONPATH=ml python3 -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv
 
+train:
+	PYTHONPATH=ml python3 -m voiceprint_ml.train --manifest ml/data/approved/manifest.csv --data-root ml/data/approved
+
+export-onnx:
+	PYTHONPATH=ml python3 -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
+
 docker-build:
 	docker build --tag voiceprint:local .
 

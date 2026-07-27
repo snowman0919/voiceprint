@@ -1,0 +1,12 @@
+{
+  "seed": 20260727,
+  "sample_rate": 16000,
+  "input_seconds": 20,
+  "batch_size": 8,
+  "epochs": 30,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.01,
+  "num_workers": 2,
+  "device": "auto",
+  "precision": "auto"
+}

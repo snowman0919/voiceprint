@@ -16,3 +16,4 @@ kaggle.json
 .playwright-cli/
 apps/web/public/wasm/
 apps/web/src/generated/
+ml/checkpoints/
