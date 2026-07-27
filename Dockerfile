@@ -11,7 +11,7 @@ FROM node:26-bookworm-slim AS web-build
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN npm install --global pnpm@11.17.0 && pnpm install --frozen-lockfile
 COPY apps/web apps/web
 COPY --from=wasm-build /workspace/apps/web/public/wasm apps/web/public/wasm
 COPY --from=wasm-build /workspace/apps/web/src/generated apps/web/src/generated
