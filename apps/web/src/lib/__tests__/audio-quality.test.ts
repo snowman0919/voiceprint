@@ -33,4 +33,10 @@ describe("inspectAudio", () => {
 
     expect(quality.estimatedSnrDb).toBeGreaterThan(20);
   });
+
+  it("does not silently truncate an overlong local recording", () => {
+    const quality = inspectAudio(new Float32Array(24_000 * 61).fill(0.1), 24_000);
+
+    expect(quality.issues).toContain("60초를 초과한 파일은 구간을 선택한 뒤 다시 시도하세요.");
+  });
 });

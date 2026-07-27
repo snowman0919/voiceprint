@@ -69,6 +69,12 @@ export function Recorder() {
     try {
       const decodeContext = new AudioContext();
       const buffer = await decodeContext.decodeAudioData(await blob.arrayBuffer());
+      if (buffer.duration > 60) {
+        await decodeContext.close();
+        setMessage("60초를 초과한 파일은 필요한 구간을 선택해 60초 이하로 저장한 뒤 다시 시도하세요.");
+        setState("error");
+        return;
+      }
       const mono = new Float32Array(buffer.length);
       for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
         const samples = buffer.getChannelData(channel);
