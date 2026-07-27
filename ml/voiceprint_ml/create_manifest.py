@@ -8,6 +8,37 @@ import json
 from pathlib import Path
 
 
+def report_evidence_digest(path: Path | None, model_id: str, version: str) -> str:
+    if path is None:
+        raise ValueError("a report-evidence file is required before activating a report model")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        dataset = payload["dataset"]
+        evaluation = payload["evaluation"]
+        onnx = payload["onnx"]
+        valid = (
+            payload["schemaVersion"] == 1
+            and payload["purpose"] == "voice-impression-report"
+            and payload["modelId"] == model_id
+            and payload["modelVersion"] == version
+            and isinstance(dataset["consentedMultiRater"], bool)
+            and dataset["consentedMultiRater"]
+            and isinstance(dataset["speakerCount"], int)
+            and dataset["speakerCount"] >= 100
+            and isinstance(evaluation["heldOutSpeakerCount"], int)
+            and evaluation["heldOutSpeakerCount"] >= 10
+            and isinstance(evaluation["calibrationEce"], (int, float))
+            and isinstance(onnx["maxAbsoluteError"], (int, float))
+            and isinstance(payload["modelCard"], str)
+            and payload["modelCard"]
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("report-evidence is incomplete or invalid") from error
+    if not valid:
+        raise ValueError("report-evidence does not meet the report-model release gate")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def create_manifest(
     model: Path,
     *,
@@ -19,12 +50,14 @@ def create_manifest(
     quantization: str,
     minimum_app_version: str,
     report_eligible: bool = False,
+    report_evidence: Path | None = None,
 ) -> dict[str, object]:
     if not model.is_file() or model.suffix != ".onnx":
         raise ValueError("an existing .onnx artifact is required")
     if not model_id or not version or input_sample_rate <= 0 or not 0 < input_seconds <= 60 or opset <= 0 or not quantization or not minimum_app_version:
         raise ValueError("model manifest arguments are incomplete")
     payload = model.read_bytes()
+    evidence_sha256 = report_evidence_digest(report_evidence, model_id, version) if report_eligible else None
     return {
         "schemaVersion": 1,
         "activeModel": model_id if report_eligible else None,
@@ -40,6 +73,7 @@ def create_manifest(
             "quantization": quantization,
             "minimumAppVersion": minimum_app_version,
             "reportEligible": report_eligible,
+            **({"reportEvidenceSha256": evidence_sha256} if evidence_sha256 else {}),
         }],
     }
 
@@ -60,6 +94,7 @@ def main() -> None:
         action="store_true",
         help="activate only a purpose-audited model for user reports",
     )
+    parser.add_argument("--report-evidence", type=Path, help="JSON evidence required with --report-eligible")
     arguments = parser.parse_args()
     manifest = create_manifest(
         arguments.model,
@@ -71,6 +106,7 @@ def main() -> None:
         quantization=arguments.quantization,
         minimum_app_version=arguments.minimum_app_version,
         report_eligible=arguments.report_eligible,
+        report_evidence=arguments.report_evidence,
     )
     arguments.output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest))

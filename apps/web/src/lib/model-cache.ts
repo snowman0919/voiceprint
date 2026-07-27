@@ -11,6 +11,7 @@ export type ModelEntry = {
   minimumAppVersion: string;
   /** True only after the data audit and held-out evaluation approve this report purpose. */
   reportEligible: boolean;
+  reportEvidenceSha256?: string;
 };
 export type ModelManifest = { schemaVersion: 1; activeModel: string | null; models: ModelEntry[] };
 
@@ -64,7 +65,13 @@ export function validateManifest(value: unknown): value is ModelManifest {
   return (
     manifest.models.every(validModel) &&
     (manifest.activeModel === null ||
-      manifest.models.some((model) => model.id === manifest.activeModel && model.reportEligible))
+      manifest.models.some(
+        (model) =>
+          model.id === manifest.activeModel &&
+          model.reportEligible &&
+          typeof model.reportEvidenceSha256 === "string" &&
+          /^[a-f0-9]{64}$/i.test(model.reportEvidenceSha256),
+      ))
   );
 }
 
