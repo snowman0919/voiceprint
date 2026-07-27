@@ -7,7 +7,7 @@
 - Next.js static export, React, TypeScript strict mode
 - AudioWorklet PCM ring buffer, Web Worker 분석, Rust/WASM DSP
 - 24kHz band-limited resampling, F0, spectral centroid, HNR, 입력 품질, waveform
-- JSON/CSV/PNG 로컬 다운로드와 fragment 기반 공유 codec
+- JSON/CSV/PNG 로컬 다운로드와 관측 음향 요약만 담는 fragment 기반 공유 링크
 - SHA-256 검증을 갖춘 Cache Storage 모델 다운로드 기반
 - Docker/Nginx 정적 런타임, CSP·COOP·COEP·Permissions Policy
 - Playwright E2E로 로컬 파일 분석 중 외부 요청과 write request가 없음을 검증

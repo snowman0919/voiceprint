@@ -6,7 +6,6 @@ const result: SharedResultV1 = {
   appVersion: "1.0.0",
   modelVersion: "pending",
   dspVersion: "0.1.0",
-  summary: { impression: 58, brightness: 71, softness: 64, stability: 82 },
   acoustic: { f0Median: 220, f0P05: 180, f0P95: 260, voicedRatio: 0.8 },
   quality: { score: 90, clippingRatio: 0 },
 };

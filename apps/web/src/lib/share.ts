@@ -4,11 +4,11 @@ export type SharedResultV1 = {
   modelVersion: string;
   dspVersion: string;
   createdAt?: string;
-  summary: { impression: number; brightness: number; softness: number; stability: number };
+  summary?: { impression: number; brightness: number; softness: number; stability: number };
   acoustic: {
-    f0Median: number;
-    f0P05: number;
-    f0P95: number;
+    f0Median?: number;
+    f0P05?: number;
+    f0P95?: number;
     f1Median?: number;
     f2Median?: number;
     f3Median?: number;
@@ -46,9 +46,13 @@ function normalize(input: SharedResultV1): SharedResultV1 {
     modelVersion: input.modelVersion,
     dspVersion: input.dspVersion,
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
-    summary: Object.fromEntries(
-      Object.entries(input.summary).map(([key, value]) => [key, Math.round(value)]),
-    ) as SharedResultV1["summary"],
+    ...(input.summary
+      ? {
+          summary: Object.fromEntries(
+            Object.entries(input.summary).map(([key, value]) => [key, Math.round(value)]),
+          ) as NonNullable<SharedResultV1["summary"]>,
+        }
+      : {}),
     acoustic: Object.fromEntries(
       Object.entries(input.acoustic)
         .filter(([, value]) => value !== undefined)
@@ -79,19 +83,15 @@ function validate(value: unknown): value is SharedResultV1 {
     typeof value.dspVersion !== "string"
   )
     return false;
-  if (!isRecord(value.summary) || !isRecord(value.acoustic) || !isRecord(value.quality)) return false;
-  return [
-    value.summary.impression,
-    value.summary.brightness,
-    value.summary.softness,
-    value.summary.stability,
-    value.acoustic.f0Median,
-    value.acoustic.f0P05,
-    value.acoustic.f0P95,
-    value.acoustic.voicedRatio,
-    value.quality.score,
-    value.quality.clippingRatio,
-  ].every(validNumber);
+  if (!isRecord(value.acoustic) || !isRecord(value.quality)) return false;
+  if (value.summary !== undefined && !isRecord(value.summary)) return false;
+  return (
+    [value.acoustic.voicedRatio, value.quality.score, value.quality.clippingRatio].every(validNumber) &&
+    (value.summary === undefined ||
+      [value.summary.impression, value.summary.brightness, value.summary.softness, value.summary.stability].every(
+        validNumber,
+      ))
+  );
 }
 
 export async function encodeSharedResult(input: SharedResultV1) {

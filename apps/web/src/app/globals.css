@@ -228,6 +228,9 @@ button {
 .downloads button {
   background: #2b7a78;
 }
+.share-status {
+  font-size: 14px;
+}
 @media (max-width: 600px) {
   body {
     padding: 20px;

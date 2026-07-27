@@ -7,6 +7,7 @@ import { downloadSummaryPng, downloadText } from "@/lib/download";
 import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal } from "@/lib/results";
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
+import { encodeSharedResult } from "@/lib/share";
 
 type InputInfo = {
   sampleRate: number;
@@ -43,6 +44,7 @@ export function Recorder() {
   const [message, setMessage] = useState<string>();
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>();
   const [analysis, setAnalysis] = useState<LocalAnalysis>();
+  const [shareUrl, setShareUrl] = useState<string>();
   const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>("clarity");
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
@@ -250,6 +252,7 @@ export function Recorder() {
 
   function startAnalysis() {
     if (!input || !quality || !dsp) return;
+    setShareUrl(undefined);
     setAnalysis(
       createLocalAnalysis(
         {
@@ -264,6 +267,32 @@ export function Recorder() {
         practiceGoal,
       ),
     );
+  }
+
+  async function shareAnalysis() {
+    if (!analysis) return;
+    const payload = await encodeSharedResult({
+      schemaVersion: 1,
+      appVersion: analysis.appVersion,
+      modelVersion: analysis.modelVersion,
+      dspVersion: analysis.dspVersion,
+      createdAt: analysis.createdAt,
+      acoustic: {
+        f0Median: analysis.acousticFeatures.f0MedianHz,
+        f0P05: analysis.acousticFeatures.f0P05Hz,
+        f0P95: analysis.acousticFeatures.f0P95Hz,
+        hnr: analysis.acousticFeatures.hnrDb,
+        voicedRatio: analysis.quality.voicedRatio,
+      },
+      quality: {
+        score: analysis.quality.score,
+        snr: analysis.quality.estimatedSnrDb,
+        clippingRatio: analysis.quality.clippingRatio,
+      },
+    });
+    const url = `${window.location.origin}/result/#r=${payload}`;
+    setShareUrl(url);
+    await navigator.clipboard?.writeText(url).catch(() => undefined);
   }
 
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
@@ -533,7 +562,15 @@ export function Recorder() {
             <button onClick={() => downloadSummaryPng(analysis)} type="button">
               PNG 다운로드
             </button>
+            <button onClick={() => void shareAnalysis()} type="button">
+              공유 링크 복사
+            </button>
           </div>
+          {shareUrl && (
+            <p className="share-status" role="status">
+              음향 요약 링크를 복사했습니다. <a href={shareUrl}>공유 결과 열기</a>
+            </p>
+          )}
         </section>
       )}
     </section>
