@@ -1,4 +1,4 @@
-.PHONY: build-wasm test-wasm lint typecheck test-web test-python data-kaggle data-audit docker-build docker-run build
+.PHONY: build-wasm test-wasm lint typecheck test-web test-e2e test-python data-kaggle data-audit docker-build docker-run build
 
 build-wasm:
 	./scripts/build-wasm.sh
@@ -14,6 +14,9 @@ typecheck:
 
 test-web:
 	pnpm --filter web test
+
+test-e2e:
+	pnpm --dir apps/web test:e2e
 
 test-python:
 	PYTHONPATH=ml python3 -m unittest discover -s ml/tests
