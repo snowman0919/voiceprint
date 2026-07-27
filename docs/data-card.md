@@ -48,7 +48,15 @@ This is a purpose-aligned research candidate, but it is **not** a report model d
 
 ### LibriTTS-VI
 
-The official [Sony LibriTTS-VI repository](https://github.com/sony/LibriTTS-VI) publishes 130 utterances with four professional raters across ten subjective voice-impression scales, plus estimated 11-dimensional values for LibriTTS-R. This is a promising source for a future, more specific impression model. However, its repository has no declared license, and the underlying LibriTTS-R audio has separate provenance and terms. Therefore it has not been downloaded or used for training. Estimated labels also must not be presented as equivalent to the 130 manually rated examples.
+The official [Sony LibriTTS-VI repository](https://github.com/sony/LibriTTS-VI) was downloaded locally for audit at commit `063084fa09ccd349b97e2a26b9f10b6ece00fb72`. Its actual files contain 130 manual TSV rows, four ratings per available manual score, and 130 distinct source speaker IDs. The 11-dimension estimated JSON has 375,035 utterance keys. Manual and pseudo labels are separate assets: manual labels may support future supervised validation only after annotation rights resolve; estimated labels remain pseudo labels and must never be held-out human-evaluation evidence.
+
+LibriTTS-R audio/metadata was separately audited from official SLR141 documents: Google LLC grants CC BY 4.0. The actual LibriTTS-VI annotation repository had neither a repository license nor GitHub license metadata at audit time. Therefore actual annotation parsing, training, cache creation, redistribution, checkpoint publication, and descriptor activation are blocked pending explicit terms or written permission. Local source audio stays outside Git, Docker, and CI artifacts. See [four-asset manifest](../ml/licenses/asset-manifest.json) and [unresolved rights](unresolved-rights.md).
+
+### VCTK-RVA / vTAD
+
+The official [vTAD repository](https://github.com/vTAD2025-Challenge/vTAD) was downloaded locally for audit at commit `b4ab83d51d1243e4b420b06a266ea2726fbd52a2`. It includes ordered pair annotations, but no raw audio. `train.txt` contains 3,408 pairs across 78 speakers; `seen.txt` has 235 pairs/76 speakers; `unseen.txt` has 229 pairs/23 speakers. Each ordered annotation uses `speaker A|speaker B` with B stronger. The checkout has no tie rows; a tie must never be fabricated or put into that ordered schema. Its 34 gender-qualified IDs correspond to 18 descriptor names.
+
+VCTK audio/metadata is a separate asset: official CSTR VCTK 0.92 documentation declares CC BY 4.0. The VCTK-RVA annotations and vTAD baseline code have no explicit repository license or GitHub license metadata. Thus no real annotation training, derived cache, code copying/modification, checkpoint distribution, or production descriptor is allowed. Original VCTK audio stays local-only and excluded from Git, Docker, and CI artifacts.
 
 ### FEMASC
 

@@ -2,6 +2,8 @@
 
 ## Status
 
+Project model status is `DATA_REASSESSMENT_REQUIRED`. No LibriTTS-VI or VCTK-RVA annotation-trained model exists, and no report descriptor is active. Source-audio CC BY evidence alone does not authorize annotation or baseline-code use. The manifest gate remains empty until all descriptor-level conditions, including annotation rights, pass.
+
 `make train-tis` trains a local TIS v1 baseline, and `make sync-tis-model` exports a browser-compatible ONNX artifact and creates its SHA-256 manifest for pipeline validation. Checkpoints, source audio, and generated ONNX files are intentionally excluded from Git. This artifact must not be added to a user-report release manifest because its label does not match the product report.
 
 The recorded local run used Apple Metal with seed `20260728`. It selected epoch 5 by validation AUROC. On the held-out 10-speaker test partition (120 clips), it measured AUROC 0.814, average precision 0.809, balanced accuracy 0.667 at the fixed 0.5 threshold, macro F1 0.644, and 10-bin expected calibration error 0.149. ONNX Runtime CPU output matched PyTorch with a maximum absolute error of `7.99e-9` for the deterministic parity input.
@@ -21,3 +23,7 @@ Brightness, softness, stability, identity, sex, age, medical status, personality
 ## Browser execution
 
 The model is downloaded as a static asset, hash-verified, placed in Cache Storage, and loaded only by a Web Worker. The worker prefers WebGPU and falls back to ONNX Runtime Web WASM. The audio buffer and model output remain in browser memory and are not placed in the share fragment.
+
+## Pending research interfaces
+
+`ml/voiceprint_ml/research_scaffold.py` contains license-safe parsers and metrics that use synthetic rows only until permissions resolve. It enforces manual/pseudo separation, grouped speaker holds-out, ordered pair direction, ACC/EER, bootstrap intervals, and descriptor release criteria. `make benchmark-rtx3080` only identifies whether the required GPU is available; it never reports an RTX 3080 memory or latency result from another device.

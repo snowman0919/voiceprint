@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { blockedResearchModel } from "../__fixtures__/blocked-report-manifest";
 import { allowsAutoDownload, validateManifest } from "../model-cache";
 
 describe("model manifest validation", () => {
@@ -32,6 +33,10 @@ describe("model manifest validation", () => {
       reportEligible: false,
     };
     expect(validateManifest({ schemaVersion: 1, activeModel: model.id, models: [model] })).toBe(false);
+  });
+
+  it("keeps a synthetic unlicensed descriptor out of browser report inference", () => {
+    expect(validateManifest({ schemaVersion: 1, activeModel: blockedResearchModel.id, models: [blockedResearchModel] })).toBe(false);
   });
 
   it("rejects an active report model without a release-evidence digest", () => {
