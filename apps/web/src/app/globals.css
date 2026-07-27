@@ -27,3 +27,9 @@ button { font-size: inherit; }
 .document h1 { font-size: clamp(36px, 7vw, 56px); letter-spacing: -.05em; line-height: 1.05; }
 .document h2 { margin-bottom: 8px; font-size: 20px; }
 .document section { display: grid; gap: 4px; padding-top: 20px; border-top: 1px solid #d9e0e8; }
+.result { display: grid; gap: 16px; padding-top: 32px; border-top: 1px solid #d9e0e8; }
+.result h3 { font-size: 18px; }
+.result ul { display: grid; gap: 8px; padding-left: 20px; color: #364152; line-height: 1.55; }
+.safety { padding: 12px; background: #fff4e5; color: #8a4b08; font-size: 14px; line-height: 1.55; }
+.downloads { display: flex; flex-wrap: wrap; gap: 8px; }
+.downloads button { background: #2b7a78; }

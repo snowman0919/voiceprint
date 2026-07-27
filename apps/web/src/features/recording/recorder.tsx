@@ -3,6 +3,9 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import type { AudioQuality } from "@/lib/audio-quality";
 import type { DspSummary } from "@/lib/dsp";
+import { downloadSummaryPng, downloadText } from "@/lib/download";
+import { createLocalAnalysis, scalarCsv, type LocalAnalysis } from "@/lib/results";
+import { brand } from "@/lib/brand";
 
 type InputInfo = { sampleRate: number; durationSeconds: number; source: string };
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
@@ -21,6 +24,7 @@ export function Recorder() {
   const [waveform, setWaveform] = useState<number[]>();
   const [input, setInput] = useState<InputInfo>();
   const [message, setMessage] = useState<string>();
+  const [analysis, setAnalysis] = useState<LocalAnalysis>();
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
   const context = useRef<AudioContext | undefined>(undefined);
@@ -82,6 +86,7 @@ export function Recorder() {
     setQuality(undefined);
     setDsp(undefined);
     setWaveform(undefined);
+    setAnalysis(undefined);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -157,6 +162,11 @@ export function Recorder() {
     if (file) void inspectBlob(file, "로컬 파일");
   }
 
+  function startAnalysis() {
+    if (!input || !quality || !dsp) return;
+    setAnalysis(createLocalAnalysis({ sampleRate: input.sampleRate, durationSeconds: input.durationSeconds, effectiveVoiceSeconds: input.durationSeconds * quality.voicedRatio }, quality, dsp, brand.appVersion, brand.dspVersion));
+  }
+
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
   return (
     <section className="recorder" aria-labelledby="recording-heading">
@@ -170,8 +180,17 @@ export function Recorder() {
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
       {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{dsp?.f0MedianHz && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}</dl>}
       {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}
-      <button disabled={!canAnalyze} type="button">분석 시작</button>
+      <button disabled={!canAnalyze} onClick={startAnalysis} type="button">분석 시작</button>
       {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · 이 기기에서만 처리</p>}
+      {analysis && <section aria-labelledby="result-heading" className="result">
+        <div><p className="eyebrow">결과</p><h2 id="result-heading">측정된 음향 특징</h2></div>
+        <p>학습 모델은 아직 배포되지 않았습니다. 아래는 규칙 기반의 로컬 음향 측정입니다.</p>
+        <dl className="quality"><div><dt>F0 중앙값</dt><dd>{Math.round(analysis.acousticFeatures.f0MedianHz ?? 0)}Hz</dd></div><div><dt>F0 5–95%</dt><dd>{Math.round(analysis.acousticFeatures.f0P05Hz ?? 0)}–{Math.round(analysis.acousticFeatures.f0P95Hz ?? 0)}Hz</dd></div><div><dt>스펙트럼 중심</dt><dd>{Math.round(analysis.acousticFeatures.spectralCentroidHz ?? 0)}Hz</dd></div><div><dt>입력 품질</dt><dd>{analysis.quality.score}</dd></div></dl>
+        <h3>연습 제안</h3>
+        <ul>{analysis.recommendations.map((recommendation) => <li key={recommendation}>{recommendation}</li>)}</ul>
+        <p className="safety">이 가이드는 음향적 연습 제안이며 의료 조언이 아닙니다. 통증 또는 불편감이 지속되면 연습을 중단하고 전문가와 상담하세요.</p>
+        <div className="downloads"><button onClick={() => downloadText(JSON.stringify(analysis, null, 2), "voiceprint-result.json", "application/json")} type="button">JSON 다운로드</button><button onClick={() => downloadText(scalarCsv(analysis), "voiceprint-features.csv", "text/csv")} type="button">CSV 다운로드</button><button onClick={() => downloadSummaryPng(analysis)} type="button">PNG 다운로드</button></div>
+      </section>}
     </section>
   );
 }
