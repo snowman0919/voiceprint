@@ -54,6 +54,9 @@ train:
 export-onnx:
 	PYTHONPATH=ml python3 -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
 
+model-manifest:
+	PYTHONPATH=ml python3 -m voiceprint_ml.create_manifest apps/web/public/models/voice-impression-v1.onnx --version 1.0.0 --quantization int8-dynamic
+
 docker-build:
 	docker build --tag voiceprint:local .
 
