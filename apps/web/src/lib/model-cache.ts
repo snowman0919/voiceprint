@@ -3,6 +3,10 @@ export type ModelManifest = { schemaVersion: 1; activeModel: string | null; mode
 
 const cacheName = "voiceprint-models-v1";
 
+export function allowsAutoDownload(saveData: boolean | undefined) {
+  return saveData !== true;
+}
+
 export function validateManifest(value: unknown): value is ModelManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<ModelManifest>;
