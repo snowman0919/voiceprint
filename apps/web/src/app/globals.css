@@ -223,6 +223,25 @@ button {
 .result h3 {
   font-size: 18px;
 }
+.tendencies {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.tendencies > div {
+  display: grid;
+  gap: 4px;
+}
+.tendencies strong {
+  font-size: 14px;
+}
+.tendencies span {
+  color: #556070;
+  font-size: 14px;
+}
+.tendencies meter {
+  width: 100%;
+}
 .result ul {
   display: grid;
   gap: 8px;
@@ -253,6 +272,9 @@ button {
     padding: 20px;
   }
   .quality {
+    grid-template-columns: 1fr;
+  }
+  .tendencies {
     grid-template-columns: 1fr;
   }
 }

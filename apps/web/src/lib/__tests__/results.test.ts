@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLocalAnalysis, scalarCsv } from "../results";
+import { acousticTendencies, createLocalAnalysis, scalarCsv } from "../results";
 
 describe("local result export", () => {
   it("exports scalar values without raw audio and recommends a fix for clipping", () => {
@@ -56,5 +56,32 @@ describe("local result export", () => {
     expect(result.recommendations).toContain(
       "음을 세게 밀기보다 입 앞쪽에서 울리는 느낌으로 명료한 모음을 유지해 보세요.",
     );
+  });
+
+  it("keeps top-line tendency scales tied to measured values, not a model label", () => {
+    const tendencies = acousticTendencies(
+      {
+        durationSeconds: 20,
+        rms: 0.1,
+        peak: 0.2,
+        clippingRatio: 0,
+        dcOffset: 0,
+        silenceRatio: 0,
+        pauseRatio: 0,
+        voicedRatio: 0.9,
+        volumeVariation: 0.2,
+        zeroCrossingRateHz: 440,
+        droppedFrames: false,
+        issues: [],
+      },
+      { f0Stability: 80, spectralCentroidHz: 2_000, frames: 10 },
+    );
+
+    expect(tendencies).toEqual([
+      { label: "음높이 안정성", score: 80, category: "높음" },
+      { label: "상대 고주파 성분", score: 50, category: "중간" },
+      { label: "유성음 연속성", score: 90, category: "높음" },
+      { label: "입력 품질", score: 100, category: "높음" },
+    ]);
   });
 });

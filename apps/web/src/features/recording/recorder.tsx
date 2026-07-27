@@ -324,7 +324,8 @@ export function Recorder() {
     );
     try {
       const output = modelPcm.current ? await inferTisIntent(modelPcm.current, input.sampleRate) : undefined;
-      if (output)
+      if (output) {
+        local.modelVersion = output.model.version;
         local.modelOutputs = {
           kind: "tis-trustworthy-intent",
           score: output.score,
@@ -332,6 +333,7 @@ export function Recorder() {
           backend: output.backend,
           modelVersion: output.model.version,
         };
+      }
     } catch {
       setMessage("학습 모델을 실행하지 못해 음향 측정 결과만 표시합니다.");
     } finally {
@@ -551,6 +553,21 @@ export function Recorder() {
               ? "아래에는 로컬 음향 측정과 제한된 녹음 조건 모델 결과를 함께 표시합니다."
               : "학습 모델을 사용할 수 없어 아래는 규칙 기반의 로컬 음향 측정입니다."}
           </p>
+          <section aria-label="측정 기반 음향 경향" className="model-result">
+            <h3>측정 기반 음향 경향</h3>
+            <p>확률이나 개인 특성 판단이 아닌, 이 녹음에서 측정한 상대 지표입니다.</p>
+            <div className="tendencies">
+              {analysis.acousticSummary.map((tendency) => (
+                <div key={tendency.label}>
+                  <strong>{tendency.label}</strong>
+                  <span>
+                    {tendency.score}/100 · {tendency.category}
+                  </span>
+                  <meter aria-label={`${tendency.label} ${tendency.score}`} max="100" min="0" value={tendency.score} />
+                </div>
+              ))}
+            </div>
+          </section>
           {analysis.modelOutputs?.kind === "tis-trustworthy-intent" && (
             <section aria-label="TIS 모델 결과" className="model-result">
               <h3>녹음 조건 모델</h3>

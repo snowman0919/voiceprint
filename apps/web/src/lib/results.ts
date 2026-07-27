@@ -18,11 +18,12 @@ export type LocalAnalysis = {
   schemaVersion: 1;
   createdAt: string;
   appVersion: string;
-  modelVersion: "not-deployed";
+  modelVersion: string;
   dspVersion: string;
   input: { sampleRate: number; durationSeconds: number; effectiveVoiceSeconds: number };
   quality: AudioQuality & { score: number };
   acousticFeatures: DspSummary;
+  acousticSummary: AcousticTendency[];
   modelOutputs: null | {
     kind: "tis-trustworthy-intent";
     score: number;
@@ -33,6 +34,38 @@ export type LocalAnalysis = {
   practiceGoal: PracticeGoal;
   recommendations: string[];
 };
+
+export type AcousticTendency = {
+  label: string;
+  score: number;
+  category: "낮음" | "다소 낮음" | "중간" | "다소 높음" | "높음";
+};
+
+function boundedScore(value: number) {
+  return Math.round(Math.max(0, Math.min(100, value)));
+}
+
+function category(score: number): AcousticTendency["category"] {
+  if (score < 20) return "낮음";
+  if (score < 40) return "다소 낮음";
+  if (score < 60) return "중간";
+  if (score < 80) return "다소 높음";
+  return "높음";
+}
+
+/** Measured, deterministic scales; these are not model probabilities or traits. */
+export function acousticTendencies(quality: AudioQuality, dsp: DspSummary): AcousticTendency[] {
+  const values = [
+    ["음높이 안정성", dsp.f0Stability ?? 0],
+    ["상대 고주파 성분", ((dsp.spectralCentroidHz ?? 0) - 500) / 30],
+    ["유성음 연속성", quality.voicedRatio * 100],
+    ["입력 품질", Math.max(0, 100 - quality.clippingRatio * 1_000 - quality.silenceRatio * 25)],
+  ] as const;
+  return values.map(([label, rawScore]) => {
+    const score = boundedScore(rawScore);
+    return { label, score, category: category(score) };
+  });
+}
 
 export function recommendations(quality: AudioQuality, dsp: DspSummary, goal: PracticeGoal) {
   const result: string[] = [];
@@ -64,6 +97,7 @@ export function createLocalAnalysis(
   dspVersion: string,
   practiceGoal: PracticeGoal = "clarity",
 ): LocalAnalysis {
+  const score = boundedScore(100 - quality.clippingRatio * 1_000 - quality.silenceRatio * 25);
   return {
     schemaVersion: 1,
     createdAt: new Date().toISOString(),
@@ -73,9 +107,10 @@ export function createLocalAnalysis(
     input,
     quality: {
       ...quality,
-      score: Math.max(0, Math.round(100 - quality.clippingRatio * 1_000 - quality.silenceRatio * 25)),
+      score,
     },
     acousticFeatures: dsp,
+    acousticSummary: acousticTendencies(quality, dsp),
     modelOutputs: null,
     practiceGoal,
     recommendations: recommendations(quality, dsp, practiceGoal),
