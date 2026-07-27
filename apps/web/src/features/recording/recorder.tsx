@@ -5,6 +5,7 @@ import type { AudioQuality } from "@/lib/audio-quality";
 
 type InputInfo = { sampleRate: number; durationSeconds: number; source: string };
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
+type CapturedPcm = { pcm: ArrayBuffer; dropped: boolean };
 
 function formatSeconds(value: number) {
   return `${Math.floor(value / 60)}:${Math.floor(value % 60).toString().padStart(2, "0")}`;
@@ -35,27 +36,36 @@ export function Recorder() {
     if (meter.current) window.cancelAnimationFrame(meter.current);
   }
 
-  async function inspect(blob: Blob, source: string) {
+  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string) {
     setState("checking");
     try {
-      const context = new AudioContext();
-      const buffer = await context.decodeAudioData(await blob.arrayBuffer());
+      const result = await new Promise<AudioQuality>((resolve, reject) => {
+        const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
+        worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
+        worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
+        worker.postMessage({ pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
+      });
+      setInput({ sampleRate, durationSeconds: result.durationSeconds, source });
+      setQuality(result);
+      setMessage(result.issues[0]);
+      setState("ready");
+    } catch {
+      setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
+      setState("error");
+    }
+  }
+
+  async function inspectBlob(blob: Blob, source: string) {
+    try {
+      const decodeContext = new AudioContext();
+      const buffer = await decodeContext.decodeAudioData(await blob.arrayBuffer());
       const mono = new Float32Array(buffer.length);
       for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
         const samples = buffer.getChannelData(channel);
         for (let index = 0; index < samples.length; index += 1) mono[index] += samples[index] / buffer.numberOfChannels;
       }
-      await context.close();
-      const result = await new Promise<AudioQuality>((resolve, reject) => {
-        const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
-        worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
-        worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
-        worker.postMessage({ pcm: mono.buffer, sampleRate: buffer.sampleRate }, [mono.buffer]);
-      });
-      setInput({ sampleRate: buffer.sampleRate, durationSeconds: buffer.duration, source });
-      setQuality(result);
-      setMessage(result.issues[0]);
-      setState("ready");
+      await decodeContext.close();
+      await inspectPcm(mono, buffer.sampleRate, source);
     } catch {
       setMessage("지원하지 않는 파일이거나 음성을 읽을 수 없습니다.");
       setState("error");
@@ -74,7 +84,8 @@ export function Recorder() {
       context.current = audio;
       const analyser = audio.createAnalyser();
       analyser.fftSize = 512;
-      audio.createMediaStreamSource(media).connect(analyser);
+      const source = audio.createMediaStreamSource(media);
+      source.connect(analyser);
       const samples = new Uint8Array(analyser.fftSize);
       const draw = () => {
         analyser.getByteTimeDomainData(samples);
@@ -84,15 +95,47 @@ export function Recorder() {
         meter.current = window.requestAnimationFrame(draw);
       };
       draw();
+      let capturedPcm: Promise<CapturedPcm> | undefined;
+      let captureNode: AudioWorkletNode | undefined;
+      try {
+        await audio.audioWorklet.addModule(new URL("../../worklets/capture.worklet.js", import.meta.url));
+        captureNode = new AudioWorkletNode(audio, "pcm-capture");
+        const silentOutput = audio.createGain();
+        silentOutput.gain.value = 0;
+        source.connect(captureNode).connect(silentOutput).connect(audio.destination);
+        capturedPcm = new Promise((resolve) => {
+          captureNode!.port.onmessage = ({ data }: MessageEvent<CapturedPcm & { type: string }>) => {
+            if (data.type === "pcm") resolve(data);
+          };
+        });
+      } catch {
+        // Older browsers keep the local MediaRecorder/decode fallback.
+      }
       const chunks: BlobPart[] = [];
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : undefined;
       const activeRecorder = new MediaRecorder(media, mimeType ? { mimeType } : undefined);
       recorder.current = activeRecorder;
       activeRecorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); };
-      activeRecorder.onstop = () => { stopTracks(); void inspect(new Blob(chunks, { type: activeRecorder.mimeType }), "마이크 녹음"); };
+      activeRecorder.onstop = () => {
+        if (captureNode && capturedPcm) {
+          captureNode.port.postMessage({ type: "flush" });
+          void capturedPcm.then(({ pcm, dropped }) => {
+            stopTracks();
+            if (dropped) setMessage("60초를 초과한 녹음은 분석할 수 없습니다.");
+            void inspectPcm(new Float32Array(pcm), audio.sampleRate, "마이크 녹음");
+          });
+          return;
+        }
+        stopTracks();
+        void inspectBlob(new Blob(chunks, { type: activeRecorder.mimeType }), "마이크 녹음");
+      };
       startedAt.current = Date.now();
       setElapsed(0);
-      timer.current = window.setInterval(() => setElapsed((Date.now() - startedAt.current) / 1000), 250);
+      timer.current = window.setInterval(() => {
+        const nextElapsed = (Date.now() - startedAt.current) / 1000;
+        setElapsed(nextElapsed);
+        if (nextElapsed >= 60 && activeRecorder.state === "recording") activeRecorder.stop();
+      }, 250);
       activeRecorder.start();
       setState("recording");
     } catch {
@@ -104,7 +147,7 @@ export function Recorder() {
   function stopRecording() { recorder.current?.stop(); }
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file) void inspect(file, "로컬 파일");
+    if (file) void inspectBlob(file, "로컬 파일");
   }
 
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
