@@ -11,10 +11,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from .download_tis import download, remote_files
+from .download_tis import _request, download, remote_files
 
 OSF_NODE = "n3twm"
 ROOT_FILES = f"https://api.osf.io/v2/nodes/{OSF_NODE}/files/osfstorage/"
+NODE_URL = f"https://api.osf.io/v2/nodes/{OSF_NODE}/"
 SUMMARY_FILE = "MunsonDolquist2025_SummaryPerceptionData.xlsx"
 FILENAME = re.compile(r"^POV_(?P<speaker>\d{3})_sent\d{2}_[A-Z]\.wav$")
 
@@ -24,6 +25,17 @@ def speaker_id(filename: str) -> str:
     if not match:
         raise ValueError(f"Palette of Voices filename has no documented speaker ID: {filename}")
     return match["speaker"]
+
+
+def verify_open_license() -> None:
+    node = _request(NODE_URL)
+    try:
+        license_url = node["data"]["relationships"]["license"]["links"]["related"]["href"]
+        license_name = _request(license_url)["data"]["attributes"]["name"]
+    except (KeyError, TypeError) as error:
+        raise ValueError("OSF project license is missing or unreadable; download is blocked") from error
+    if license_name != "CC-By Attribution 4.0 International":
+        raise ValueError(f"OSF project license is not approved for this download: {license_name}")
 
 
 def write_manifest(output: Path) -> None:
@@ -58,6 +70,7 @@ def write_manifest(output: Path) -> None:
 
 
 def download_palette_of_voices(output: Path) -> None:
+    verify_open_license()
     files = remote_files(ROOT_FILES)
     selected = [file for file in files if file.relative_path.suffix.lower() == ".wav" or file.relative_path.name == SUMMARY_FILE]
     # Keep OSF requests resumable while avoiding a long serial download.

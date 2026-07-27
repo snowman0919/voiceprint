@@ -3,8 +3,9 @@ import unittest
 from pathlib import Path
 
 import pandas as pd
+from unittest.mock import patch
 
-from voiceprint_ml.download_palette_of_voices import speaker_id, write_manifest
+from voiceprint_ml.download_palette_of_voices import speaker_id, verify_open_license, write_manifest
 
 
 class PaletteOfVoicesDownloadTests(unittest.TestCase):
@@ -27,3 +28,10 @@ class PaletteOfVoicesDownloadTests(unittest.TestCase):
     def test_refuses_audio_without_the_documented_speaker_contract(self) -> None:
         with self.assertRaisesRegex(ValueError, "speaker ID"):
             speaker_id("unknown.wav")
+
+    def test_refuses_download_when_the_osf_license_is_not_cc_by_4(self) -> None:
+        node = {"data": {"relationships": {"license": {"links": {"related": {"href": "https://example/license"}}}}}}
+        license = {"data": {"attributes": {"name": "CC-By-NC 4.0"}}}
+        with patch("voiceprint_ml.download_palette_of_voices._request", side_effect=[node, license]):
+            with self.assertRaisesRegex(ValueError, "not approved"):
+                verify_open_license()
