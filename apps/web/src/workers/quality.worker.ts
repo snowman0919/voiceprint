@@ -1,5 +1,6 @@
 import { inspectAudio } from "@/lib/audio-quality";
 import type { DspSummary } from "@/lib/dsp";
+import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number };
 
@@ -35,8 +36,8 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
   const pcm = new Float32Array(data.pcm);
   const quality = inspectAudio(pcm, data.sampleRate);
   try {
-    self.postMessage({ quality, dsp: await analyzeDsp(pcm, data.sampleRate) });
+    self.postMessage({ quality, dsp: await analyzeDsp(pcm, data.sampleRate), waveform: peakEnvelope(pcm) });
   } catch {
-    self.postMessage({ quality, dsp: undefined });
+    self.postMessage({ quality, dsp: undefined, waveform: peakEnvelope(pcm) });
   }
 };

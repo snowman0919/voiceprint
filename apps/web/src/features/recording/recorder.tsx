@@ -18,6 +18,7 @@ export function Recorder() {
   const [level, setLevel] = useState(0);
   const [quality, setQuality] = useState<AudioQuality>();
   const [dsp, setDsp] = useState<DspSummary>();
+  const [waveform, setWaveform] = useState<number[]>();
   const [input, setInput] = useState<InputInfo>();
   const [message, setMessage] = useState<string>();
   const recorder = useRef<MediaRecorder | undefined>(undefined);
@@ -41,7 +42,7 @@ export function Recorder() {
   async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string) {
     setState("checking");
     try {
-      const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary }>((resolve, reject) => {
+      const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>((resolve, reject) => {
         const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
         worker.onmessage = ({ data }) => { worker.terminate(); resolve(data); };
         worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
@@ -50,6 +51,7 @@ export function Recorder() {
       setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source });
       setQuality(result.quality);
       setDsp(result.dsp);
+      setWaveform(result.waveform);
       setMessage(result.quality.issues[0]);
       setState("ready");
     } catch {
@@ -79,6 +81,7 @@ export function Recorder() {
     setMessage(undefined);
     setQuality(undefined);
     setDsp(undefined);
+    setWaveform(undefined);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -166,6 +169,7 @@ export function Recorder() {
       {state === "checking" && <p role="status">입력 품질 확인 중…</p>}
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
       {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{dsp?.f0MedianHz && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}</dl>}
+      {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}
       <button disabled={!canAnalyze} type="button">분석 시작</button>
       {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · 이 기기에서만 처리</p>}
     </section>
