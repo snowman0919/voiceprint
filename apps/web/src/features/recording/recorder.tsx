@@ -7,7 +7,7 @@ import { downloadSummaryPng, downloadText } from "@/lib/download";
 import { createLocalAnalysis, scalarCsv, type LocalAnalysis } from "@/lib/results";
 import { brand } from "@/lib/brand";
 
-type InputInfo = { sampleRate: number; durationSeconds: number; source: string };
+type InputInfo = { sampleRate: number; durationSeconds: number; source: string; processing?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean } };
 type RecordingState = "idle" | "recording" | "checking" | "ready" | "error";
 type CapturedPcm = { pcm: ArrayBuffer; dropped: boolean };
 
@@ -43,7 +43,7 @@ export function Recorder() {
     if (meter.current) window.cancelAnimationFrame(meter.current);
   }
 
-  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string) {
+  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string, processing?: InputInfo["processing"]) {
     setState("checking");
     setAnalysis(undefined);
     try {
@@ -53,7 +53,7 @@ export function Recorder() {
         worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
         worker.postMessage({ pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
       });
-      setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source });
+      setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source, processing });
       setQuality(result.quality);
       setDsp(result.dsp);
       setWaveform(result.waveform);
@@ -93,6 +93,12 @@ export function Recorder() {
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       stream.current = media;
+      const settings = media.getAudioTracks()[0]?.getSettings();
+      const processing = {
+        echoCancellation: settings?.echoCancellation,
+        noiseSuppression: settings?.noiseSuppression,
+        autoGainControl: settings?.autoGainControl,
+      };
       const audio = new AudioContext();
       context.current = audio;
       const analyser = audio.createAnalyser();
@@ -135,7 +141,7 @@ export function Recorder() {
           void capturedPcm.then(({ pcm, dropped }) => {
             stopTracks();
             if (dropped) setMessage("60초를 초과한 녹음은 분석할 수 없습니다.");
-            void inspectPcm(new Float32Array(pcm), audio.sampleRate, "마이크 녹음");
+            void inspectPcm(new Float32Array(pcm), audio.sampleRate, "마이크 녹음", processing);
           });
           return;
         }
@@ -179,10 +185,10 @@ export function Recorder() {
       <label className="file"><span>또는 로컬 파일 선택</span><input accept="audio/*" onChange={selectFile} type="file" /></label>
       {state === "checking" && <p role="status">입력 품질 확인 중…</p>}
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
-      {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{dsp?.f0MedianHz !== undefined && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz !== undefined && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}{dsp?.hnrDb !== undefined && <div><dt>HNR</dt><dd>{dsp.hnrDb.toFixed(1)}dB</dd></div>}</dl>}
+      {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{quality.estimatedSnrDb !== undefined && <div><dt>추정 SNR</dt><dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd></div>}{dsp?.f0MedianHz !== undefined && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz !== undefined && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}{dsp?.hnrDb !== undefined && <div><dt>HNR</dt><dd>{dsp.hnrDb.toFixed(1)}dB</dd></div>}</dl>}
       {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}
       <button disabled={!canAnalyze} onClick={startAnalysis} type="button">분석 시작</button>
-      {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · 이 기기에서만 처리</p>}
+      {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · {input.processing && `처리 설정: 반향 ${input.processing.echoCancellation === undefined ? "미확인" : input.processing.echoCancellation ? "켜짐" : "꺼짐"}, 소음 억제 ${input.processing.noiseSuppression === undefined ? "미확인" : input.processing.noiseSuppression ? "켜짐" : "꺼짐"}, 자동 이득 ${input.processing.autoGainControl === undefined ? "미확인" : input.processing.autoGainControl ? "켜짐" : "꺼짐"} · `}이 기기에서만 처리</p>}
       {analysis && <section aria-labelledby="result-heading" className="result">
         <div><p className="eyebrow">결과</p><h2 id="result-heading">측정된 음향 특징</h2></div>
         <p>학습 모델은 아직 배포되지 않았습니다. 아래는 규칙 기반의 로컬 음향 측정입니다.</p>

@@ -23,4 +23,14 @@ describe("inspectAudio", () => {
 
     expect(quality.issues).not.toContain("유효 음성이 8초보다 짧습니다.");
   });
+
+  it("uses 20ms frames at the browser sample rate when estimating noise", () => {
+    const sampleRate = 48_000;
+    const pcm = new Float32Array(sampleRate * 8).fill(0.1);
+    for (let index = 0; index < pcm.length; index += sampleRate / 25) pcm.fill(0.001, index, index + sampleRate / 50);
+
+    const quality = inspectAudio(pcm, sampleRate);
+
+    expect(quality.estimatedSnrDb).toBeGreaterThan(20);
+  });
 });
