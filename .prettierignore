@@ -4,6 +4,7 @@ apps/web/out/
 apps/web/public/wasm/
 apps/web/src/generated/
 apps/web/test-results/
+apps/web/public/og.svg
 fixtures/audio/
 ml/uv.lock
 pnpm-lock.yaml
