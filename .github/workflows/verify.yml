@@ -26,5 +26,5 @@ jobs:
       - run: cargo install wasm-pack --locked
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
-      - run: make lint typecheck test-wasm test-python test-web test-e2e build
+      - run: make lint typecheck test-wasm benchmark-dsp-compile test-python test-web test-e2e build
       - run: docker build --tag voiceprint:ci .

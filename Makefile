@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm lint typecheck test test-web test-e2e test-python data-kaggle data-audit docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile lint typecheck test test-web test-e2e test-python data-kaggle data-audit docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -15,6 +15,9 @@ test-wasm:
 
 benchmark-dsp:
 	cargo bench -p voice-dsp
+
+benchmark-dsp-compile:
+	cargo bench -p voice-dsp --no-run
 
 lint:
 	pnpm lint
