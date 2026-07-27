@@ -39,4 +39,11 @@ describe("inspectAudio", () => {
 
     expect(quality.issues).toContain("60초를 초과한 파일은 구간을 선택한 뒤 다시 시도하세요.");
   });
+
+  it("blocks a capture with dropped audio frames instead of trusting partial PCM", () => {
+    const quality = inspectAudio(new Float32Array(24_000 * 8).fill(0.1), 24_000, true);
+
+    expect(quality.droppedFrames).toBe(true);
+    expect(quality.issues).toContain("녹음 중 오디오 프레임이 손실되었습니다.");
+  });
 });

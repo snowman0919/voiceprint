@@ -7,10 +7,11 @@ export type AudioQuality = {
   silenceRatio: number;
   voicedRatio: number;
   estimatedSnrDb?: number;
+  droppedFrames: boolean;
   issues: string[];
 };
 
-export function inspectAudio(pcm: Float32Array, sampleRate: number): AudioQuality {
+export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrames = false): AudioQuality {
   let sumSquares = 0;
   let sum = 0;
   let peak = 0;
@@ -55,6 +56,7 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number): AudioQualit
   if (clippingRatio > 0.01) issues.push("clipping이 큽니다.");
   if (voicedFrames / Math.max(frameCount, 1) < 0.2) issues.push("유성음이 부족합니다.");
   if (estimatedSnrDb !== undefined && estimatedSnrDb < 10) issues.push("배경 소음이 큽니다.");
+  if (droppedFrames) issues.push("녹음 중 오디오 프레임이 손실되었습니다.");
 
   return {
     durationSeconds,
@@ -65,6 +67,7 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number): AudioQualit
     silenceRatio: quietFrames / Math.max(frameCount, 1),
     voicedRatio: voicedFrames / Math.max(frameCount, 1),
     estimatedSnrDb,
+    droppedFrames,
     issues,
   };
 }

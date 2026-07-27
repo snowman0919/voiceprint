@@ -47,7 +47,7 @@ export function Recorder() {
     if (meter.current) window.cancelAnimationFrame(meter.current);
   }
 
-  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string, processing?: InputInfo["processing"]) {
+  async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string, processing?: InputInfo["processing"], droppedFrames = false) {
     setState("checking");
     setAnalysisStage("input");
     setAnalysis(undefined);
@@ -59,7 +59,7 @@ export function Recorder() {
           if (data.type === "result") { worker.terminate(); resolve(data); }
         };
         worker.onerror = () => { worker.terminate(); reject(new Error("품질 검사를 시작할 수 없습니다.")); };
-        worker.postMessage({ pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
+        worker.postMessage({ pcm: pcm.buffer, sampleRate, droppedFrames }, [pcm.buffer]);
       });
       setInput({ sampleRate, durationSeconds: result.quality.durationSeconds, source, processing });
       setQuality(result.quality);
@@ -156,8 +156,7 @@ export function Recorder() {
           captureNode.port.postMessage({ type: "flush" });
           void capturedPcm.then(({ pcm, dropped }) => {
             stopTracks();
-            if (dropped) setMessage("60초를 초과한 녹음은 분석할 수 없습니다.");
-            void inspectPcm(new Float32Array(pcm), audio.sampleRate, "마이크 녹음", processing);
+            void inspectPcm(new Float32Array(pcm), audio.sampleRate, "마이크 녹음", processing, dropped);
           });
           return;
         }

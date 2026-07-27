@@ -2,7 +2,7 @@ import { inspectAudio } from "@/lib/audio-quality";
 import { summarizeF0, type DspSummary } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
-type Request = { pcm: ArrayBuffer; sampleRate: number };
+type Request = { pcm: ArrayBuffer; sampleRate: number; droppedFrames?: boolean };
 type Stage = "input" | "pitch" | "timbre" | "finalizing";
 
 function stage(value: Stage) { self.postMessage({ type: "stage", value }); }
@@ -46,7 +46,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
 self.onmessage = async ({ data }: MessageEvent<Request>) => {
   const pcm = new Float32Array(data.pcm);
   stage("input");
-  const quality = inspectAudio(pcm, data.sampleRate);
+  const quality = inspectAudio(pcm, data.sampleRate, data.droppedFrames);
   try {
     const dsp = await analyzeDsp(pcm, data.sampleRate);
     stage("finalizing");
