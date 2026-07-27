@@ -18,6 +18,8 @@ test("local file analysis sends no audio or result data over the network", async
   await expect(page.getByRole("img", { name: "F0 궤적" })).toBeVisible();
   await page.getByRole("button", { name: "분석 시작" }).click();
   await expect(page.getByRole("heading", { name: "측정된 음향 특징" })).toBeVisible();
+  await page.getByRole("button", { name: "공유 링크 복사" }).click();
+  await expect(page.getByRole("link", { name: "공유 결과 열기" })).toBeVisible();
   expect(writes).toEqual([]);
   expect(external).toEqual([]);
 });
