@@ -49,6 +49,7 @@ export function scalarCsv(result: LocalAnalysis) {
     f0P05Hz: result.acousticFeatures.f0P05Hz ?? "",
     f0P95Hz: result.acousticFeatures.f0P95Hz ?? "",
     spectralCentroidHz: result.acousticFeatures.spectralCentroidHz ?? "",
+    hnrDb: result.acousticFeatures.hnrDb ?? "",
   };
   return `${Object.keys(values).join(",")}\n${Object.values(values).join(",")}\n`;
 }

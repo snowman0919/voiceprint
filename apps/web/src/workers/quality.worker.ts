@@ -15,10 +15,13 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   const frameSize = Math.round(sampleRate * 0.08);
   const frameCount = Math.min(20, Math.floor(pcm.length / frameSize));
   const f0: number[] = [];
+  const hnr: number[] = [];
   for (let frame = 0; frame < frameCount; frame += 1) {
     const offset = Math.floor((pcm.length - frameSize) * (frameCount === 1 ? 0 : frame / (frameCount - 1)));
     const value = wasm.estimate_f0_hz(pcm.subarray(offset, offset + frameSize), sampleRate);
     if (Number.isFinite(value)) f0.push(value);
+    const hnrValue = wasm.hnr_db(pcm.subarray(offset, offset + frameSize), sampleRate);
+    if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
   }
   f0.sort((left, right) => left - right);
   const centroidFrame = pcm.subarray(0, Math.min(1024, pcm.length));
@@ -28,6 +31,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     f0P05Hz: f0.length ? percentile(f0, 0.05) : undefined,
     f0P95Hz: f0.length ? percentile(f0, 0.95) : undefined,
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
+    hnrDb: hnr.length ? hnr.reduce((total, value) => total + value, 0) / hnr.length : undefined,
     frames: f0.length,
   };
 }

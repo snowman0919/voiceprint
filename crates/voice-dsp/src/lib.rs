@@ -55,6 +55,24 @@ pub fn estimate_f0(frame: &[f32], sample_rate: f32) -> Option<f32> {
     (*correlation >= 0.65).then_some(sample_rate / (min_lag + index) as f32)
 }
 
+/// Estimates harmonic-to-noise ratio from the normalized autocorrelation at the
+/// detected period. Unvoiced/noisy frames remain unavailable instead of yielding
+/// a misleading dB value.
+pub fn harmonic_to_noise_ratio_db(frame: &[f32], sample_rate: f32) -> Option<f32> {
+    let f0 = estimate_f0(frame, sample_rate)?;
+    let lag = (sample_rate / f0).round() as usize;
+    let mean = frame.iter().sum::<f32>() / frame.len() as f32;
+    let centered: Vec<f32> = frame.iter().map(|sample| sample - mean).collect();
+    let (mut numerator, mut left_energy, mut right_energy) = (0.0, 0.0, 0.0);
+    for index in lag..centered.len() {
+        numerator += centered[index] * centered[index - lag];
+        left_energy += centered[index] * centered[index];
+        right_energy += centered[index - lag] * centered[index - lag];
+    }
+    let periodicity = numerator / (left_energy * right_energy).sqrt().max(1e-12);
+    (periodicity >= 0.8).then_some(10.0 * (periodicity / (1.0 - periodicity).max(1e-6)).log10())
+}
+
 /// Calculates spectral features from the first Hann-windowed frame. Callers choose
 /// frame size and hop policy; this primitive never allocates an audio copy.
 pub fn spectral_features(
@@ -124,6 +142,11 @@ pub fn spectral_centroid_hz(frame: &[f32], sample_rate: f32) -> f32 {
         .unwrap_or(f32::NAN)
 }
 
+#[wasm_bindgen]
+pub fn hnr_db(frame: &[f32], sample_rate: f32) -> f32 {
+    harmonic_to_noise_ratio_db(frame, sample_rate).unwrap_or(f32::NAN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +186,16 @@ mod tests {
             "unexpected centroid: {}",
             spectrum.centroid_hz
         );
+    }
+
+    #[test]
+    fn returns_hnr_for_periodic_signal_but_not_unvoiced_noise() {
+        let sine_frame = sine(220.0, 0.08, 24_000.0);
+        let hnr = harmonic_to_noise_ratio_db(&sine_frame, 24_000.0).expect("periodic tone has HNR");
+        assert!(hnr > 20.0, "clean tone should have high HNR, got {hnr}");
+        let noise = (0..1_920)
+            .map(|index| ((index * 7 % 17) as f32 / 8.0) - 1.0)
+            .collect::<Vec<_>>();
+        assert_eq!(harmonic_to_noise_ratio_db(&noise, 24_000.0), None);
     }
 }
