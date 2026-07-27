@@ -27,6 +27,9 @@ data-kaggle:
 data-audit:
 	PYTHONPATH=ml python3 -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json
 
+split:
+	PYTHONPATH=ml python3 -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv
+
 docker-build:
 	docker build --tag voiceprint:local .
 
