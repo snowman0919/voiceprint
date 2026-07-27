@@ -5,7 +5,10 @@ export type AudioQuality = {
   clippingRatio: number;
   dcOffset: number;
   silenceRatio: number;
+  pauseRatio: number;
   voicedRatio: number;
+  volumeVariation: number;
+  zeroCrossingRateHz: number;
   estimatedSnrDb?: number;
   droppedFrames: boolean;
   issues: string[];
@@ -18,6 +21,8 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
   let clipped = 0;
   let quietFrames = 0;
   let voicedFrames = 0;
+  let zeroCrossings = 0;
+  let previous = 0;
   const frameSamples = Math.max(1, Math.round(sampleRate * 0.02));
   const frameRmsValues: number[] = [];
   const frameCount = Math.ceil(pcm.length / frameSamples);
@@ -27,6 +32,8 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
     let frameSquares = 0;
     for (let index = start; index < end; index += 1) {
       const sample = pcm[index];
+      if (index > 0 && sample >= 0 !== previous >= 0) zeroCrossings += 1;
+      previous = sample;
       const magnitude = Math.abs(sample);
       sumSquares += sample * sample;
       sum += sample;
@@ -50,6 +57,13 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
     quiet.length && voiced.length
       ? 20 * Math.log10(Math.max(average(voiced), 1e-8) / Math.max(average(quiet), 1e-8))
       : undefined;
+  const frameMean = average(frameRmsValues);
+  const volumeVariation =
+    frameMean > 0
+      ? Math.sqrt(
+          frameRmsValues.reduce((total, value) => total + (value - frameMean) ** 2, 0) / frameRmsValues.length,
+        ) / frameMean
+      : 0;
   const issues: string[] = [];
   if (durationSeconds < 7.99) issues.push("유효 음성이 8초보다 짧습니다.");
   if (durationSeconds > 60) issues.push("60초를 초과한 파일은 구간을 선택한 뒤 다시 시도하세요.");
@@ -66,7 +80,10 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
     clippingRatio,
     dcOffset: sum / Math.max(pcm.length, 1),
     silenceRatio: quietFrames / Math.max(frameCount, 1),
+    pauseRatio: quietFrames / Math.max(frameCount, 1),
     voicedRatio: voicedFrames / Math.max(frameCount, 1),
+    volumeVariation,
+    zeroCrossingRateHz: zeroCrossings / Math.max(durationSeconds, 1e-12),
     estimatedSnrDb,
     droppedFrames,
     issues,

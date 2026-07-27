@@ -290,6 +290,14 @@ export function Recorder() {
             <dt>유성음</dt>
             <dd>{Math.round(quality.voicedRatio * 100)}%</dd>
           </div>
+          <div>
+            <dt>휴지 비율</dt>
+            <dd>{Math.round(quality.pauseRatio * 100)}%</dd>
+          </div>
+          <div>
+            <dt>음량 변화</dt>
+            <dd>{Math.round(quality.volumeVariation * 100)}%</dd>
+          </div>
           {quality.estimatedSnrDb !== undefined && (
             <div>
               <dt>추정 SNR</dt>
@@ -415,6 +423,18 @@ export function Recorder() {
             <div>
               <dt>입력 품질</dt>
               <dd>{analysis.quality.score}</dd>
+            </div>
+            <div>
+              <dt>휴지 비율</dt>
+              <dd>{Math.round(analysis.quality.pauseRatio * 100)}%</dd>
+            </div>
+            <div>
+              <dt>음량 변화</dt>
+              <dd>{Math.round(analysis.quality.volumeVariation * 100)}%</dd>
+            </div>
+            <div>
+              <dt>Zero-crossing rate</dt>
+              <dd>{Math.round(analysis.quality.zeroCrossingRateHz)}Hz</dd>
             </div>
           </dl>
           <h3>연습 제안</h3>

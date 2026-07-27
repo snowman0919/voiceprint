@@ -46,4 +46,15 @@ describe("inspectAudio", () => {
     expect(quality.droppedFrames).toBe(true);
     expect(quality.issues).toContain("녹음 중 오디오 프레임이 손실되었습니다.");
   });
+
+  it("measures zero crossings from signal transitions rather than a hard-coded voice range", () => {
+    const sampleRate = 24_000;
+    const pcm = Float32Array.from({ length: sampleRate * 8 }, (_, index) =>
+      Math.sin((2 * Math.PI * 220 * index) / sampleRate),
+    );
+    const quality = inspectAudio(pcm, sampleRate);
+
+    expect(quality.zeroCrossingRateHz).toBeCloseTo(440, -1);
+    expect(quality.pauseRatio).toBe(0);
+  });
 });
