@@ -150,6 +150,8 @@ export function Recorder() {
   }
 
   async function startRecording() {
+    setPendingRange(undefined);
+    pendingAudio.current = null;
     setMessage(undefined);
     setQuality(undefined);
     setDsp(undefined);
@@ -239,7 +241,11 @@ export function Recorder() {
   }
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file) void inspectBlob(file, "로컬 파일");
+    if (file) {
+      setPendingRange(undefined);
+      pendingAudio.current = null;
+      void inspectBlob(file, "로컬 파일");
+    }
   }
 
   function startAnalysis() {
