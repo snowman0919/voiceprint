@@ -8,6 +8,7 @@ import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal }
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
 import { encodeSharedResult } from "@/lib/share";
+import { Spectrogram } from "./spectrogram";
 
 type InputInfo = {
   sampleRate: number;
@@ -427,6 +428,12 @@ export function Recorder() {
             <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />
           ))}
         </svg>
+      )}
+      {dsp?.spectrogram && (
+        <section aria-labelledby="spectrogram-heading">
+          <h3 id="spectrogram-heading">스펙트로그램</h3>
+          <Spectrogram data={dsp.spectrogram} />
+        </section>
       )}
       <label className="goal">
         연습 목표

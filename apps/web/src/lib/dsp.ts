@@ -1,3 +1,9 @@
+export type Spectrogram = {
+  frames: number;
+  bins: number;
+  levels: Uint8Array;
+};
+
 export type DspSummary = {
   f0MedianHz?: number;
   f0MeanHz?: number;
@@ -14,6 +20,7 @@ export type DspSummary = {
   spectralFlatness?: number;
   hnrDb?: number;
   frames: number;
+  spectrogram?: Spectrogram;
 };
 
 function percentile(values: number[], fraction: number) {

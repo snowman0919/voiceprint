@@ -1,6 +1,6 @@
 import { inspectAudio } from "@/lib/audio-quality";
 import { analysisConfig } from "@/lib/analysis-config";
-import { summarizeF0, type DspSummary } from "@/lib/dsp";
+import { summarizeF0, type DspSummary, type Spectrogram } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number; droppedFrames?: boolean };
@@ -28,6 +28,18 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
   }
   stage("timbre");
+  const spectrogramFrameSize = Math.round(analysisSampleRate * analysisConfig.spectrogramFrameSeconds);
+  const spectrogramHopSize = Math.round(analysisSampleRate * analysisConfig.spectrogramHopSeconds);
+  const spectrogramValues = wasm.log_power_spectrogram_wasm(
+    analysisPcm,
+    spectrogramFrameSize,
+    analysisConfig.spectralFftSize,
+    spectrogramHopSize,
+    analysisConfig.maxSpectrogramFrames,
+  );
+  const spectrogramBins = analysisConfig.spectralFftSize / 2 + 1;
+  const spectrogramFrames = spectrogramValues.length / spectrogramBins;
+  const spectrogram = normalizeSpectrogram(spectrogramValues, spectrogramFrames, spectrogramBins);
   const centroidFrame = analysisPcm.subarray(0, Math.min(analysisConfig.spectralFftSize, analysisPcm.length));
   const centroid =
     centroidFrame.length === analysisConfig.spectralFftSize
@@ -58,7 +70,21 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     spectralFlatness: Number.isFinite(flatness) ? flatness : undefined,
     hnrDb: hnr.length ? hnr.reduce((total, value) => total + value, 0) / hnr.length : undefined,
     frames: f0.length,
+    spectrogram,
   };
+}
+
+function normalizeSpectrogram(values: Float32Array, frames: number, bins: number): Spectrogram | undefined {
+  if (!frames || !bins || values.length !== frames * bins) return undefined;
+  let minimum = Number.POSITIVE_INFINITY;
+  let maximum = Number.NEGATIVE_INFINITY;
+  values.forEach((value) => {
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  });
+  const range = Math.max(1e-6, maximum - minimum);
+  const levels = Uint8Array.from(values, (value) => Math.round(((value - minimum) / range) * 255));
+  return { frames, bins, levels };
 }
 
 self.onmessage = async ({ data }: MessageEvent<Request>) => {
@@ -68,7 +94,8 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
   try {
     const dsp = await analyzeDsp(pcm, data.sampleRate);
     stage("finalizing");
-    self.postMessage({ type: "result", quality, dsp, waveform: peakEnvelope(pcm) });
+    const waveform = peakEnvelope(pcm);
+    self.postMessage({ type: "result", quality, dsp, waveform });
   } catch {
     stage("finalizing");
     self.postMessage({ type: "result", quality, dsp: undefined, waveform: peakEnvelope(pcm) });

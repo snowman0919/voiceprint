@@ -2,10 +2,10 @@
 
 ## Current automated evidence
 
-- Rust DSP tests validate F0, silence handling, centroid, periodic/noise HNR gating, and band-limited resampling behavior.
+- Rust DSP tests validate F0, silence handling, 25 ms/10 ms STFT tonal-bin placement and epsilon flooring, centroid, periodic/noise HNR gating, and band-limited resampling behavior.
 - Python tests reject unlabeled/unsafe data routes and speaker leakage in deterministic split assignment.
 - Browser unit tests prevent PCM/waveform fields from downloads and share payloads, and validate ONNX WebGPU→WASM fallback ordering.
-- Playwright loads a real local WAV, runs analysis, and asserts that no POST/PUT/PATCH request is made and every observed request remains on the local static origin.
+- Playwright loads a real local WAV, renders the actual Worker/WASM waveform and log-power spectrogram, and asserts that no POST/PUT/PATCH request is made and every observed request remains on the local static origin.
 - CI builds the static export, installs Chromium for the browser flow, and builds the multi-stage Docker image.
 
 ## DSP benchmark

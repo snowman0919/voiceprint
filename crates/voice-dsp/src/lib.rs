@@ -56,6 +56,53 @@ pub struct SpectralFeatures {
     pub flatness: f32,
 }
 
+/// Produces a time-major Hann-windowed log-power spectrogram. When the source
+/// has more frames than `max_frames`, it samples across the entire recording so
+/// the browser can render an overview without retaining an unbounded matrix.
+pub fn log_power_spectrogram(
+    samples: &[f32],
+    frame_size: usize,
+    fft_size: usize,
+    hop_size: usize,
+    max_frames: usize,
+) -> Vec<f32> {
+    if frame_size < 2
+        || frame_size > fft_size
+        || hop_size == 0
+        || max_frames == 0
+        || samples.len() < frame_size
+    {
+        return Vec::new();
+    }
+    let available_frames = 1 + (samples.len() - frame_size) / hop_size;
+    let frame_count = available_frames.min(max_frames);
+    let bins_per_frame = fft_size / 2 + 1;
+    let mut output = Vec::with_capacity(frame_count * bins_per_frame);
+    let mut planner = FftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(fft_size);
+    for frame_index in 0..frame_count {
+        let source_frame = if frame_count == 1 {
+            0
+        } else {
+            frame_index * (available_frames - 1) / (frame_count - 1)
+        };
+        let offset = source_frame * hop_size;
+        let mut bins = vec![Complex32::new(0.0, 0.0); fft_size];
+        for (index, bin) in bins.iter_mut().take(frame_size).enumerate() {
+            let window = 0.5
+                - 0.5 * (2.0 * core::f32::consts::PI * index as f32 / (frame_size - 1) as f32).cos();
+            bin.re = samples[offset + index] * window;
+        }
+        fft.process(&mut bins);
+        output.extend(
+            bins[..bins_per_frame]
+                .iter()
+                .map(|bin| bin.norm_sqr().max(1e-12).log10()),
+        );
+    }
+    output
+}
+
 /// Estimates F0 with normalized autocorrelation. Returns `None` for silence or an
 /// ambiguous period, rather than fabricating a pitch.
 pub fn estimate_f0(frame: &[f32], sample_rate: f32) -> Option<f32> {
@@ -229,6 +276,17 @@ pub fn hnr_db(frame: &[f32], sample_rate: f32) -> f32 {
 }
 
 #[wasm_bindgen]
+pub fn log_power_spectrogram_wasm(
+    samples: &[f32],
+    frame_size: usize,
+    fft_size: usize,
+    hop_size: usize,
+    max_frames: usize,
+) -> Vec<f32> {
+    log_power_spectrogram(samples, frame_size, fft_size, hop_size, max_frames)
+}
+
+#[wasm_bindgen]
 pub fn resample_to_24khz(samples: &[f32], source_rate: f32) -> Vec<f32> {
     resample_bandlimited(samples, source_rate, 24_000.0)
 }
@@ -303,6 +361,33 @@ mod tests {
             spectrum.bandwidth_hz > 2_000.0,
             "noise should be broadband: {}",
             spectrum.bandwidth_hz
+        );
+    }
+
+    #[test]
+    fn stft_keeps_a_tone_in_its_expected_frequency_bin() {
+        let audio = sine(1_000.0, 0.12, 24_000.0);
+        let fft_size = 1_024;
+        let spectrum = log_power_spectrogram(&audio, 600, fft_size, 240, 8);
+        let first_frame = &spectrum[..fft_size / 2 + 1];
+        let (peak_bin, _) = first_frame
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .expect("a valid STFT frame has bins");
+        let peak_hz = peak_bin as f32 * 24_000.0 / fft_size as f32;
+        assert!(
+            (peak_hz - 1_000.0).abs() < 40.0,
+            "tone peak drifted to {peak_hz}Hz"
+        );
+    }
+
+    #[test]
+    fn stft_silence_has_finite_epsilon_floored_values() {
+        let spectrum = log_power_spectrogram(&vec![0.0; 1_024], 600, 1_024, 240, 8);
+        assert!(
+            spectrum.iter().all(|value| value.is_finite() && *value <= -11.9),
+            "silence must not generate NaN/Inf or false energy"
         );
     }
 
