@@ -4,7 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import type { AudioQuality } from "@/lib/audio-quality";
 import type { DspSummary } from "@/lib/dsp";
 import { downloadSummaryPng, downloadText } from "@/lib/download";
-import { createLocalAnalysis, scalarCsv, type LocalAnalysis } from "@/lib/results";
+import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal } from "@/lib/results";
 import { brand } from "@/lib/brand";
 
 type InputInfo = { sampleRate: number; durationSeconds: number; source: string; processing?: { echoCancellation?: boolean; noiseSuppression?: boolean; autoGainControl?: boolean } };
@@ -29,6 +29,7 @@ export function Recorder() {
   const [message, setMessage] = useState<string>();
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>();
   const [analysis, setAnalysis] = useState<LocalAnalysis>();
+  const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>("clarity");
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
   const context = useRef<AudioContext | undefined>(undefined);
@@ -186,7 +187,7 @@ export function Recorder() {
 
   function startAnalysis() {
     if (!input || !quality || !dsp) return;
-    setAnalysis(createLocalAnalysis({ sampleRate: input.sampleRate, durationSeconds: input.durationSeconds, effectiveVoiceSeconds: input.durationSeconds * quality.voicedRatio }, quality, dsp, brand.appVersion, brand.dspVersion));
+    setAnalysis(createLocalAnalysis({ sampleRate: input.sampleRate, durationSeconds: input.durationSeconds, effectiveVoiceSeconds: input.durationSeconds * quality.voicedRatio }, quality, dsp, brand.appVersion, brand.dspVersion, practiceGoal));
   }
 
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
@@ -202,6 +203,7 @@ export function Recorder() {
       {message && <p className={quality?.issues.length ? "warning" : "error"} role="status">{message}</p>}
       {quality && input && <dl className="quality"><div><dt>길이</dt><dd>{input.durationSeconds.toFixed(1)}초</dd></div><div><dt>입력 음량</dt><dd>{Math.round(quality.rms * 100)}%</dd></div><div><dt>clipping</dt><dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd></div><div><dt>유성음</dt><dd>{Math.round(quality.voicedRatio * 100)}%</dd></div>{quality.estimatedSnrDb !== undefined && <div><dt>추정 SNR</dt><dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd></div>}{dsp?.f0MedianHz !== undefined && <div><dt>F0 중앙값</dt><dd>{Math.round(dsp.f0MedianHz)}Hz</dd></div>}{dsp?.spectralCentroidHz !== undefined && <div><dt>스펙트럼 중심</dt><dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd></div>}{dsp?.hnrDb !== undefined && <div><dt>HNR</dt><dd>{dsp.hnrDb.toFixed(1)}dB</dd></div>}</dl>}
       {waveform && <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">{waveform.map((peak, index) => <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />)}</svg>}
+      <label className="goal">연습 목표<select onChange={(event) => setPracticeGoal(event.target.value as PracticeGoal)} value={practiceGoal}><option value="clarity">더 또렷하게</option><option value="stability">더 안정적으로</option><option value="brightness">더 밝게</option><option value="softness">더 부드럽게</option><option value="calm">더 낮고 차분하게</option><option value="lightness">더 높고 가볍게</option><option value="intonation">억양을 풍부하게</option><option value="relaxation">긴장감을 줄이기</option></select></label>
       <button disabled={!canAnalyze} onClick={startAnalysis} type="button">분석 시작</button>
       {input && <p className="metadata">{input.source} · {input.sampleRate.toLocaleString()}Hz · {input.processing && `처리 설정: 반향 ${input.processing.echoCancellation === undefined ? "미확인" : input.processing.echoCancellation ? "켜짐" : "꺼짐"}, 소음 억제 ${input.processing.noiseSuppression === undefined ? "미확인" : input.processing.noiseSuppression ? "켜짐" : "꺼짐"}, 자동 이득 ${input.processing.autoGainControl === undefined ? "미확인" : input.processing.autoGainControl ? "켜짐" : "꺼짐"} · `}이 기기에서만 처리</p>}
       {analysis && <section aria-labelledby="result-heading" className="result">

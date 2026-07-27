@@ -16,6 +16,8 @@ button { font-size: inherit; }
 .recorder button:disabled { background: #9aa8b8; cursor: not-allowed; }
 .file { background: transparent; border: 1px solid #aab5c2; color: #14213d; }
 .file input { display: none; }
+.goal { display: grid; gap: 6px; width: fit-content; color: #364152; font-size: 14px; font-weight: 700; }
+.goal select { min-width: 220px; border: 1px solid #aab5c2; border-radius: 4px; padding: 10px; background: #fff; color: #14213d; font: inherit; }
 .warning, .error { padding: 12px; line-height: 1.5; background: #fff4e5; color: #8a4b08; }
 .error { background: #fff0f0; color: #a12424; }
 .quality { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #d9e0e8; border: 1px solid #d9e0e8; }
