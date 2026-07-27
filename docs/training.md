@@ -19,3 +19,5 @@ The best validation checkpoint is saved locally under `ml/checkpoints/` (ignored
 `make model-manifest` hashes the exact ONNX bytes in `apps/web/public/models/` and writes the size, local URL, input contract, and SHA-256 into the static manifest. Review the generated metadata and its matching model card before committing either artifact.
 
 `make validate-onnx` runs the checkpoint and exported ONNX model against the same seeded waveform using CPU ONNX Runtime. It fails when maximum absolute output error exceeds `1e-4`; record the result in the model card before browser deployment.
+
+`make evaluate-tis` (also available as `make train-baseline` or `make evaluate`) trains Logistic Regression, RBF SVM, and Random Forest on the same TIS speaker-disjoint training split, then writes held-out test AUROC, average precision, balanced accuracy, and macro F1 to ignored `ml/checkpoints/tis-baselines.json`. These baselines use only compact waveform summary features and remain limited to the corpus's recording-condition label.

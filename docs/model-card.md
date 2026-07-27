@@ -6,6 +6,8 @@
 
 The recorded local run used Apple Metal with seed `20260728`. It selected epoch 5 by validation AUROC. On the held-out 10-speaker test partition (120 clips), it measured AUROC 0.814, average precision 0.809, and balanced accuracy 0.667 at the fixed 0.5 threshold. ONNX Runtime CPU output matched PyTorch with a maximum absolute error of `7.99e-9` for the deterministic parity input.
 
+For context, `make evaluate-tis` ran speaker-disjoint handcrafted baselines on the identical held-out speakers: Logistic Regression AUROC 0.566 / balanced accuracy 0.550, RBF SVM 0.559 / 0.492, and Random Forest 0.577 / 0.542. These are one local run on a small corpus, not evidence of general-purpose intent inference.
+
 ## Label and use boundary
 
 TIS v1's only output is a score for the dataset's **speaker-produced trustworthy-intent recording condition**, averaged over up to three four-second local windows. It is not a probability, listener rating, truthfulness detector, personality assessment, or a claim about the person speaking. It is trained on short English research recordings and should not be generalized beyond that setting.
