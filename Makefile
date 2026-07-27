@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit split train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -48,8 +48,14 @@ data-tis:
 data-audit:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json
 
+data-tis-audit:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.data_audit ml/data/tis --output ml/data/tis/audit.json
+
 split:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.split ml/data/kaggle/manifest.csv ml/data/kaggle/split.csv
+
+split-tis:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.split ml/data/tis/tis-manifest.csv ml/data/tis/tis-split.csv
 
 train:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.train --manifest ml/data/approved/manifest.csv --data-root ml/data/approved
