@@ -56,6 +56,141 @@ pub struct SpectralFeatures {
     pub flatness: f32,
 }
 
+/// A conservative formant estimate from a Burg-LPC spectral envelope.  The
+/// browser caller still needs temporal continuity and an offline reference
+/// comparison before showing these values as production phonetic evidence.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FormantFeatures {
+    pub f1_hz: f32,
+    pub f2_hz: f32,
+    pub f3_hz: f32,
+    pub residual_ratio: f32,
+    pub ceiling_hz: f32,
+}
+
+fn burg_lpc(samples: &[f32], order: usize) -> Option<(Vec<f32>, f32)> {
+    if samples.len() <= order + 2 || order < 2 {
+        return None;
+    }
+    let mean = samples.iter().sum::<f32>() / samples.len() as f32;
+    let mut signal = Vec::with_capacity(samples.len());
+    for (index, sample) in samples.iter().enumerate() {
+        let previous = if index == 0 { mean } else { samples[index - 1] };
+        signal.push((sample - mean) - 0.97 * (previous - mean));
+    }
+    let source_energy = signal.iter().map(|value| value * value).sum::<f32>();
+    if source_energy <= 1e-8 {
+        return None;
+    }
+    let mut forward = signal[1..].to_vec();
+    let mut backward = signal[..signal.len() - 1].to_vec();
+    let mut coefficients = vec![1.0];
+    for stage in 1..=order {
+        if forward.len() < 2 {
+            return None;
+        }
+        let numerator = -2.0
+            * forward
+                .iter()
+                .zip(&backward)
+                .map(|(left, right)| left * right)
+                .sum::<f32>();
+        let denominator = forward.iter().map(|value| value * value).sum::<f32>()
+            + backward.iter().map(|value| value * value).sum::<f32>();
+        if denominator <= 1e-12 {
+            return None;
+        }
+        let reflection = numerator / denominator;
+        if !reflection.is_finite() || reflection.abs() >= 0.9999 {
+            return None;
+        }
+        let previous = coefficients.clone();
+        coefficients.push(reflection);
+        for index in 1..stage {
+            coefficients[index] = previous[index] + reflection * previous[stage - index];
+        }
+        let mut next_forward = Vec::with_capacity(forward.len() - 1);
+        let mut next_backward = Vec::with_capacity(backward.len() - 1);
+        for index in 1..forward.len() {
+            next_forward.push(forward[index] + reflection * backward[index]);
+            next_backward.push(backward[index - 1] + reflection * forward[index - 1]);
+        }
+        forward = next_forward;
+        backward = next_backward;
+    }
+    let residual = (order..signal.len())
+        .map(|index| {
+            let prediction = (1..=order)
+                .map(|coefficient| coefficients[coefficient] * signal[index - coefficient])
+                .sum::<f32>();
+            let error = signal[index] + prediction;
+            error * error
+        })
+        .sum::<f32>()
+        / source_energy;
+    Some((coefficients, residual))
+}
+
+fn lpc_envelope_peaks(coefficients: &[f32], sample_rate: f32, ceiling_hz: f32) -> Vec<(f32, f32)> {
+    const BINS: usize = 2_048;
+    let maximum_bin = ((ceiling_hz / sample_rate * BINS as f32).floor() as usize).min(BINS / 2);
+    let powers = (0..=maximum_bin)
+        .map(|bin| {
+            let frequency = bin as f32 * sample_rate / BINS as f32;
+            let omega = 2.0 * core::f32::consts::PI * frequency / sample_rate;
+            let (real, imaginary) = coefficients.iter().enumerate().fold((0.0, 0.0), |(real, imaginary), (index, coefficient)| {
+                (real + coefficient * (omega * index as f32).cos(), imaginary - coefficient * (omega * index as f32).sin())
+            });
+            1.0 / (real * real + imaginary * imaginary).max(1e-12)
+        })
+        .collect::<Vec<_>>();
+    let mut candidates = powers
+        .windows(3)
+        .enumerate()
+        .filter_map(|(index, values)| {
+            let bin = index + 1;
+            let frequency = bin as f32 * sample_rate / BINS as f32;
+            (frequency >= 90.0 && values[1] > values[0] && values[1] >= values[2]).then_some((frequency, values[1]))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| right.1.total_cmp(&left.1));
+    let mut selected: Vec<(f32, f32)> = Vec::new();
+    for candidate in candidates {
+        if selected.iter().all(|(frequency, _)| (candidate.0 - frequency).abs() >= 140.0) {
+            selected.push(candidate);
+        }
+        if selected.len() == 3 {
+            break;
+        }
+    }
+    selected.sort_by(|left, right| left.0.total_cmp(&right.0));
+    selected
+}
+
+/// Evaluates several formant ceilings and returns only a complete, ordered
+/// three-formant path.  Missing or unstable candidates remain unavailable.
+pub fn estimate_formants(frame: &[f32], sample_rate: f32) -> Option<FormantFeatures> {
+    if sample_rate <= 0.0 || frame.len() < 240 {
+        return None;
+    }
+    let order = ((sample_rate / 1_000.0).round() as usize * 2).clamp(10, 24);
+    let (coefficients, residual_ratio) = burg_lpc(frame, order)?;
+    [4_500.0, 5_000.0, 5_500.0, 6_000.0, 6_500.0, 7_000.0, 8_000.0]
+        .into_iter()
+        .filter(|ceiling| *ceiling < sample_rate * 0.5 - 100.0)
+        .filter_map(|ceiling_hz| {
+            let peaks = lpc_envelope_peaks(&coefficients, sample_rate, ceiling_hz);
+            (peaks.len() == 3).then_some(FormantFeatures {
+                f1_hz: peaks[0].0,
+                f2_hz: peaks[1].0,
+                f3_hz: peaks[2].0,
+                residual_ratio,
+                ceiling_hz,
+            })
+        })
+        .min_by(|left, right| left.residual_ratio.total_cmp(&right.residual_ratio))
+}
+
 /// Produces a time-major Hann-windowed log-power spectrogram. When the source
 /// has more frames than `max_frames`, it samples across the entire recording so
 /// the browser can render an overview without retaining an unbounded matrix.
@@ -275,6 +410,23 @@ pub fn hnr_db(frame: &[f32], sample_rate: f32) -> f32 {
     harmonic_to_noise_ratio_db(frame, sample_rate).unwrap_or(f32::NAN)
 }
 
+/// Returns F1, F2, F3, residual ratio, and selected ceiling; an empty vector
+/// means that no complete LPC candidate satisfied the conservative gate.
+#[wasm_bindgen]
+pub fn estimate_formants_wasm(frame: &[f32], sample_rate: f32) -> Vec<f32> {
+    estimate_formants(frame, sample_rate)
+        .map(|features| {
+            vec![
+                features.f1_hz,
+                features.f2_hz,
+                features.f3_hz,
+                features.residual_ratio,
+                features.ceiling_hz,
+            ]
+        })
+        .unwrap_or_default()
+}
+
 #[wasm_bindgen]
 pub fn log_power_spectrogram_wasm(
     samples: &[f32],
@@ -298,6 +450,21 @@ mod tests {
     fn sine(hz: f32, seconds: f32, sample_rate: f32) -> Vec<f32> {
         (0..(seconds * sample_rate) as usize)
             .map(|index| (2.0 * core::f32::consts::PI * hz * index as f32 / sample_rate).sin())
+            .collect()
+    }
+
+    fn resonant_signal(frequencies: &[f32], seconds: f32, sample_rate: f32) -> Vec<f32> {
+        (0..(seconds * sample_rate) as usize)
+            .map(|index| {
+                frequencies
+                    .iter()
+                    .enumerate()
+                    .map(|(harmonic, frequency)| {
+                        (2.0 * core::f32::consts::PI * frequency * index as f32 / sample_rate).sin()
+                            / (harmonic + 1) as f32
+                    })
+                    .sum()
+            })
             .collect()
     }
 
@@ -420,5 +587,16 @@ mod tests {
             / filtered.len() as f32)
             .sqrt();
         assert!(rms < 0.15, "out-of-band signal aliased into output: {rms}");
+    }
+
+    #[test]
+    fn burg_lpc_recovers_ordered_resonance_peaks_without_inventing_silence_formants() {
+        let frame = resonant_signal(&[500.0, 1_500.0, 2_500.0], 0.08, 24_000.0);
+        let formants = estimate_formants(&frame, 24_000.0).expect("three synthetic resonances should produce a complete LPC path");
+        assert!((formants.f1_hz - 500.0).abs() < 180.0, "unexpected F1: {}", formants.f1_hz);
+        assert!((formants.f2_hz - 1_500.0).abs() < 220.0, "unexpected F2: {}", formants.f2_hz);
+        assert!((formants.f3_hz - 2_500.0).abs() < 260.0, "unexpected F3: {}", formants.f3_hz);
+        assert!(formants.f1_hz < formants.f2_hz && formants.f2_hz < formants.f3_hz);
+        assert_eq!(estimate_formants(&vec![0.0; 1_920], 24_000.0), None);
     }
 }
