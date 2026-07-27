@@ -178,6 +178,16 @@ button {
   image-rendering: auto;
   background: #111827;
 }
+.f0-contour {
+  display: block;
+  width: 100%;
+  height: 120px;
+  background: #edf2f7;
+}
+.f0-contour polyline {
+  stroke: #6b46c1;
+  stroke-width: 1.5;
+}
 .document {
   width: min(100%, 720px);
   display: grid;

@@ -8,6 +8,7 @@ import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal }
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
 import { encodeSharedResult } from "@/lib/share";
+import { F0Contour } from "./f0-contour";
 import { Spectrogram } from "./spectrogram";
 
 type InputInfo = {
@@ -433,6 +434,12 @@ export function Recorder() {
         <section aria-labelledby="spectrogram-heading">
           <h3 id="spectrogram-heading">스펙트로그램</h3>
           <Spectrogram data={dsp.spectrogram} />
+        </section>
+      )}
+      {dsp?.f0ContourHz && (
+        <section aria-labelledby="f0-contour-heading">
+          <h3 id="f0-contour-heading">F0 궤적</h3>
+          <F0Contour values={dsp.f0ContourHz} />
         </section>
       )}
       <label className="goal">

@@ -15,6 +15,7 @@ test("local file analysis sends no audio or result data over the network", async
   await expect(page.getByRole("img", { name: "입력 파형" })).toBeVisible();
   await expect(page.getByRole("img", { name: "로그 파워 스펙트로그램" })).toBeVisible();
   await expect(page.getByText("F0 중앙값")).toBeVisible();
+  await expect(page.getByRole("img", { name: "F0 궤적" })).toBeVisible();
   await page.getByRole("button", { name: "분석 시작" }).click();
   await expect(page.getByRole("heading", { name: "측정된 음향 특징" })).toBeVisible();
   expect(writes).toEqual([]);
