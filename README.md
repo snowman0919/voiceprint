@@ -12,7 +12,7 @@
 - Docker/Nginx 정적 런타임, CSP·COOP·COEP·Permissions Policy
 - Playwright E2E로 로컬 파일 분석 중 외부 요청과 write request가 없음을 검증
 
-학습 모델은 아직 배포하지 않았습니다. Kaggle 데이터는 라이선스·원본 오디오·화자 ID를 검증하기 전까지 학습에 사용하지 않습니다. 별도로 공식 OSF에서 CC BY 4.0으로 배포한 TIS 코퍼스는 `trustworthy intent`라는 한정된 녹음 조건 연구용으로만 감사·학습 후보입니다. 이는 일반적인 신뢰성·성격·개인 특성의 판정이 아닙니다.
+Kaggle 데이터는 라이선스·원본 오디오·화자 ID를 검증하기 전까지 학습에 사용하지 않습니다. 공식 OSF의 CC BY 4.0 TIS 코퍼스는 `trustworthy intent`라는 한정된 녹음 조건용 모델로만 학습할 수 있습니다. `make train-tis`와 `make sync-tis-model`은 로컬 체크포인트·ONNX·해시 manifest를 생성하며, 이 생성물은 저장소에 커밋하지 않습니다. 이는 일반적인 신뢰성·성격·개인 특성의 판정이 아닙니다.
 
 ## 구조
 
@@ -66,6 +66,14 @@ make split-tis
 ```
 
 TIS의 `trustworthy`/`neutral`은 화자가 의도해 낸 녹음 조건일 뿐, 청취자가 평가한 보편적 인상이나 사람의 신뢰성·성격을 뜻하지 않습니다.
+
+학습과 브라우저용 모델 생성은 다음과 같습니다. 생성된 모델을 포함한 정적 배포 빌드는 이후 `make build`로 만듭니다.
+
+```sh
+make train-tis
+make sync-tis-model
+make build
+```
 
 승인된 데이터가 준비된 뒤의 결정론적 학습·held-out 평가·ONNX export 절차는 [docs/training.md](docs/training.md)를 따릅니다.
 

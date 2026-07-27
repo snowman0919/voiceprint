@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis export-onnx export-tis-onnx model-manifest validate-onnx validate-tis-onnx sync-model sync-tis-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx sync-model sync-tis-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -72,6 +72,9 @@ export-tis-onnx:
 model-manifest:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.create_manifest apps/web/public/models/voice-impression-v1.onnx --version 1.0.0 --quantization int8-dynamic
 
+model-manifest-tis:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.create_manifest apps/web/public/models/tis-intent-v1.onnx --model-id tis-intent-v1 --version 1.0.0 --input-seconds 4 --quantization none
+
 validate-onnx:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.validate_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
 
@@ -80,7 +83,7 @@ validate-tis-onnx:
 
 sync-model: validate-onnx model-manifest
 
-sync-tis-model: export-tis-onnx validate-tis-onnx
+sync-tis-model: export-tis-onnx validate-tis-onnx model-manifest-tis
 
 benchmark: benchmark-dsp
 

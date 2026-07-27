@@ -2,22 +2,16 @@
 
 ## Status
 
-No trained model is distributed yet. Browser results currently show only deterministic local acoustic measurements from Rust/WASM.
+`make train-tis` trains a local TIS v1 model, and `make sync-tis-model` exports a browser-ready ONNX artifact and creates its SHA-256 manifest. Checkpoints, source audio, and generated ONNX files are intentionally excluded from Git. A release/deployment build must run these commands before the static Next.js build.
 
-## Intended model boundary
+The recorded local run used Apple Metal with seed `20260728`. It selected epoch 5 by validation AUROC. On the held-out 10-speaker test partition (120 clips), it measured AUROC 0.814, average precision 0.809, and balanced accuracy 0.667 at the fixed 0.5 threshold. ONNX Runtime CPU output matched PyTorch with a maximum absolute error of `7.99e-9` for the deterministic parity input.
 
-The future baseline may classify dataset-specific acoustic labels after license, source format, and speaker-disjoint splitting are verified. It will not infer identity, medical status, personality, actual age, actual sex, or gender identity.
+## Label and use boundary
 
-Brightness, softness, and stability require validated labels before becoming model outputs. Until then they remain measurement-derived observations, not AI predictions.
+TIS v1's only output is a score for the dataset's **speaker-produced trustworthy-intent recording condition**, averaged over up to three four-second local windows. It is not a probability, listener rating, truthfulness detector, personality assessment, or a claim about the person speaking. It is trained on short English research recordings and should not be generalized beyond that setting.
 
-# Model card
+Brightness, softness, stability, identity, sex, age, medical status, personality, and actual intent are not TIS model outputs. The general pipeline rejects biological-sex, identity, age, and speaker-name label columns before training. A Kaggle scalar-feature dataset cannot be repurposed as a waveform model or a user-facing identity/gender inference model.
 
-## Status
+## Browser execution
 
-No trained model is distributed with this repository. `model-manifest.json` has no active model by design. The included PyTorch pipeline only accepts an approved waveform dataset whose manifest contains speaker-disjoint splits and four non-sensitive, 0–1 tendency targets: `impression`, `brightness`, `softness`, and `stability`.
-
-The pipeline rejects biological-sex, identity, age, and speaker-name label columns before training. A Kaggle scalar-feature dataset cannot be repurposed as a waveform model or a user-facing identity/gender inference model.
-
-## Intended use
-
-If and only if a model passes the validation gate, it may describe the acoustic impression of a recording as a non-probabilistic tendency. It must not identify people, infer biology, diagnose a condition, or make claims about personality, emotion, or truthfulness.
+The model is downloaded as a static asset, hash-verified, placed in Cache Storage, and loaded only by a Web Worker. The worker prefers WebGPU and falls back to ONNX Runtime Web WASM. The audio buffer and model output remain in browser memory and are not placed in the share fragment.
