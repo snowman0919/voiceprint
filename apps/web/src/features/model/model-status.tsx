@@ -1,15 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  allowsAutoDownload,
-  cachedModel,
-  cachedModelBytes,
-  downloadAndVerify,
-  loadManifest,
-  type ModelEntry,
-} from "@/lib/model-cache";
-import { createOnDeviceSession, warmUpOnDeviceSession, type InferenceBackend } from "@/lib/inference";
+import { allowsAutoDownload, cachedModel, downloadAndVerify, loadManifest, type ModelEntry } from "@/lib/model-cache";
+import type { InferenceBackend } from "@/lib/inference";
 
 type Status = "loading" | "unavailable" | "ready" | "downloading" | "error";
 
@@ -21,10 +14,32 @@ export function ModelStatus() {
   const [backend, setBackend] = useState<InferenceBackend>();
   const abort = useRef<AbortController | null>(null);
 
-  const startLocalSession = useCallback(async (active: ModelEntry) => {
-    const result = await createOnDeviceSession(await cachedModelBytes(active));
-    await warmUpOnDeviceSession(result, active.inputSampleRate, active.inputSeconds);
-    setBackend(result.backend);
+  const startLocalSession = useCallback(async (active: ModelEntry, signal?: AbortSignal) => {
+    const worker = new Worker(new URL("../../workers/model.worker.ts", import.meta.url));
+    return new Promise<void>((resolve, reject) => {
+      const stop = () => {
+        worker.terminate();
+        reject(new DOMException("모델 준비가 취소되었습니다.", "AbortError"));
+      };
+      if (signal?.aborted) return stop();
+      signal?.addEventListener("abort", stop, { once: true });
+      worker.onmessage = ({
+        data,
+      }: MessageEvent<{ type: "ready"; backend: InferenceBackend } | { type: "error"; message: string }>) => {
+        signal?.removeEventListener("abort", stop);
+        worker.terminate();
+        if (data.type === "ready") {
+          setBackend(data.backend);
+          resolve();
+        } else reject(new Error(data.message));
+      };
+      worker.onerror = () => {
+        signal?.removeEventListener("abort", stop);
+        worker.terminate();
+        reject(new Error("이 기기에서 분석 모델을 시작할 수 없습니다."));
+      };
+      worker.postMessage({ model: active });
+    });
   }, []);
 
   const download = useCallback(
@@ -44,7 +59,7 @@ export function ModelStatus() {
             if (controller.signal.aborted || attempt === 1) throw reason;
           }
         }
-        await startLocalSession(active);
+        await startLocalSession(active, controller.signal);
         setStatus("ready");
       } catch (reason) {
         if (controller.signal.aborted) {
@@ -68,7 +83,9 @@ export function ModelStatus() {
         }
         setModel(active);
         if (await cachedModel(active)) {
-          await startLocalSession(active);
+          const controller = new AbortController();
+          abort.current = controller;
+          await startLocalSession(active, controller.signal);
           setStatus("ready");
           return;
         }

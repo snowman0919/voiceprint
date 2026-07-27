@@ -12,7 +12,7 @@ export type ModelEntry = {
 };
 export type ModelManifest = { schemaVersion: 1; activeModel: string | null; models: ModelEntry[] };
 
-const cacheName = "voiceprint-models-v1";
+export const modelCacheName = "voiceprint-models-v1";
 
 export function allowsAutoDownload(saveData: boolean | undefined) {
   return saveData !== true;
@@ -72,7 +72,7 @@ export async function loadManifest() {
 }
 
 export async function cachedModel(model: ModelEntry) {
-  return (await caches.open(cacheName)).match(model.url);
+  return (await caches.open(modelCacheName)).match(model.url);
 }
 
 export async function cachedModelBytes(model: ModelEntry) {
@@ -82,7 +82,7 @@ export async function cachedModelBytes(model: ModelEntry) {
 }
 
 export async function clearModelCache() {
-  await caches.delete(cacheName);
+  await caches.delete(modelCacheName);
 }
 
 function hex(bytes: ArrayBuffer) {
@@ -116,5 +116,5 @@ export async function downloadAndVerify(
   if (hex(await crypto.subtle.digest("SHA-256", bytes)) !== model.sha256.toLowerCase())
     throw new Error("모델 무결성 검증에 실패했습니다.");
   const verified = new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } });
-  await (await caches.open(cacheName)).put(model.url, verified);
+  await (await caches.open(modelCacheName)).put(model.url, verified);
 }
