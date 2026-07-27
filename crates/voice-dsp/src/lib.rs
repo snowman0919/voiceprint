@@ -54,6 +54,10 @@ pub struct SpectralFeatures {
     pub rolloff_85_hz: f32,
     pub rolloff_95_hz: f32,
     pub flatness: f32,
+    pub slope_db_per_khz: f32,
+    pub low_band_ratio: f32,
+    pub mid_band_ratio: f32,
+    pub high_band_ratio: f32,
 }
 
 /// A conservative formant estimate from a Burg-LPC spectral envelope.  The
@@ -326,14 +330,8 @@ pub fn harmonic_to_noise_ratio_db(frame: &[f32], sample_rate: f32) -> Option<f32
     (periodicity >= 0.8).then_some(10.0 * (periodicity / (1.0 - periodicity).max(1e-6)).log10())
 }
 
-/// Calculates spectral features from the first Hann-windowed frame. Callers choose
-/// frame size and hop policy; this primitive never allocates an audio copy.
-pub fn spectral_features(
-    frame: &[f32],
-    sample_rate: f32,
-    fft_size: usize,
-) -> Option<SpectralFeatures> {
-    if frame.is_empty() || frame.len() > fft_size || fft_size < 2 || sample_rate <= 0.0 {
+fn power_spectrum(frame: &[f32], fft_size: usize) -> Option<Vec<f32>> {
+    if frame.is_empty() || frame.len() > fft_size || fft_size < 2 {
         return None;
     }
     let mut bins = vec![Complex32::new(0.0, 0.0); fft_size];
@@ -345,10 +343,25 @@ pub fn spectral_features(
     FftPlanner::<f32>::new()
         .plan_fft_forward(fft_size)
         .process(&mut bins);
-    let powers: Vec<f32> = bins[..=(fft_size / 2)]
-        .iter()
-        .map(|bin| bin.norm_sqr())
-        .collect();
+    Some(
+        bins[..=(fft_size / 2)]
+            .iter()
+            .map(|bin| bin.norm_sqr())
+            .collect(),
+    )
+}
+
+/// Calculates spectral features from one Hann-windowed frame. Callers choose
+/// frame size and hop policy; this primitive never allocates an audio copy.
+pub fn spectral_features(
+    frame: &[f32],
+    sample_rate: f32,
+    fft_size: usize,
+) -> Option<SpectralFeatures> {
+    if sample_rate <= 0.0 {
+        return None;
+    }
+    let powers = power_spectrum(frame, fft_size)?;
     let total = powers.iter().sum::<f32>();
     if total <= 1e-12 {
         return None;
@@ -384,13 +397,66 @@ pub fn spectral_features(
         .sum::<f32>()
         / powers.len() as f32;
     let arithmetic_mean = total / powers.len() as f32;
+    let mean_x = (0..powers.len())
+        .map(|bin| bin as f32 * hz_per_bin / 1_000.0)
+        .sum::<f32>()
+        / powers.len() as f32;
+    let mean_y = powers
+        .iter()
+        .map(|power| 10.0 * power.max(1e-12).log10())
+        .sum::<f32>()
+        / powers.len() as f32;
+    let (covariance, variance) =
+        powers
+            .iter()
+            .enumerate()
+            .fold((0.0, 0.0), |(covariance, variance), (bin, power)| {
+                let x = bin as f32 * hz_per_bin / 1_000.0 - mean_x;
+                let y = 10.0 * power.max(1e-12).log10() - mean_y;
+                (covariance + x * y, variance + x * x)
+            });
+    let ratio_in = |start_hz: f32, end_hz: f32| {
+        powers
+            .iter()
+            .enumerate()
+            .filter(|(bin, _)| {
+                let frequency = *bin as f32 * hz_per_bin;
+                frequency >= start_hz && frequency < end_hz
+            })
+            .map(|(_, power)| power)
+            .sum::<f32>()
+            / total
+    };
     Some(SpectralFeatures {
         centroid_hz,
         bandwidth_hz,
         rolloff_85_hz: rolloff(0.85),
         rolloff_95_hz: rolloff(0.95),
         flatness: geometric_mean.exp() / arithmetic_mean,
+        slope_db_per_khz: covariance / variance.max(1e-12),
+        low_band_ratio: ratio_in(0.0, 1_000.0),
+        mid_band_ratio: ratio_in(1_000.0, 4_000.0),
+        high_band_ratio: ratio_in(4_000.0, sample_rate * 0.5 + hz_per_bin),
     })
+}
+
+/// Normalized positive spectral change between neighboring frames. A repeated
+/// frame is zero; a new dominant frequency produces a positive value.
+pub fn spectral_flux(previous: &[f32], current: &[f32], fft_size: usize) -> Option<f32> {
+    let previous = power_spectrum(previous, fft_size)?;
+    let current = power_spectrum(current, fft_size)?;
+    let previous_total = previous.iter().sum::<f32>();
+    let current_total = current.iter().sum::<f32>();
+    if previous_total <= 1e-12 || current_total <= 1e-12 {
+        return None;
+    }
+    Some(
+        previous
+            .iter()
+            .zip(&current)
+            .map(|(left, right)| (right / current_total - left / previous_total).max(0.0))
+            .sum(),
+    )
 }
 
 #[wasm_bindgen]
@@ -431,6 +497,31 @@ pub fn spectral_flatness(frame: &[f32], sample_rate: f32) -> f32 {
     spectral_features(frame, sample_rate, 1024)
         .map(|features| features.flatness)
         .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_slope_db_per_khz(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.slope_db_per_khz)
+        .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_band_energy_ratios(frame: &[f32], sample_rate: f32) -> Vec<f32> {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| {
+            vec![
+                features.low_band_ratio,
+                features.mid_band_ratio,
+                features.high_band_ratio,
+            ]
+        })
+        .unwrap_or_default()
+}
+
+#[wasm_bindgen]
+pub fn spectral_flux_wasm(previous: &[f32], current: &[f32]) -> f32 {
+    spectral_flux(previous, current, 1024).unwrap_or(f32::NAN)
 }
 
 #[wasm_bindgen]
@@ -556,6 +647,31 @@ mod tests {
             spectrum.bandwidth_hz > 2_000.0,
             "noise should be broadband: {}",
             spectrum.bandwidth_hz
+        );
+    }
+
+    #[test]
+    fn distinguishes_low_and_high_frequency_energy_and_frame_change() {
+        let low = sine(500.0, 0.04, 24_000.0);
+        let high = sine(5_000.0, 0.04, 24_000.0);
+        let low_features = spectral_features(&low, 24_000.0, 1024).expect("low tone has spectrum");
+        let high_features =
+            spectral_features(&high, 24_000.0, 1024).expect("high tone has spectrum");
+        assert!(
+            low_features.low_band_ratio > high_features.low_band_ratio,
+            "500Hz tone must concentrate energy below 1kHz"
+        );
+        assert!(
+            high_features.high_band_ratio > low_features.high_band_ratio,
+            "5kHz tone must concentrate energy above 4kHz"
+        );
+        assert!(
+            spectral_flux(&low, &low, 1024).expect("repeated frame has flux") < 1e-5,
+            "unchanged frame must not report timbral movement"
+        );
+        assert!(
+            spectral_flux(&low, &high, 1024).expect("changed frame has flux") > 0.5,
+            "different dominant frequency must produce substantial spectral flux"
         );
     }
 

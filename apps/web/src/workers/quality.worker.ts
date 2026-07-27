@@ -61,6 +61,30 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     centroidFrame.length === analysisConfig.spectralFftSize
       ? wasm.spectral_flatness(centroidFrame, analysisSampleRate)
       : Number.NaN;
+  const slope =
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_slope_db_per_khz(centroidFrame, analysisSampleRate)
+      : Number.NaN;
+  const bandEnergy =
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_band_energy_ratios(centroidFrame, analysisSampleRate)
+      : [];
+  const flux: number[] = [];
+  const fluxFrames = Math.min(
+    analysisConfig.maxSummaryFrames,
+    Math.floor(analysisPcm.length / analysisConfig.spectralFftSize),
+  );
+  for (let frame = 1; frame < fluxFrames; frame += 1) {
+    const previousOffset = Math.floor(
+      (analysisPcm.length - analysisConfig.spectralFftSize) * ((frame - 1) / (fluxFrames - 1)),
+    );
+    const offset = Math.floor((analysisPcm.length - analysisConfig.spectralFftSize) * (frame / (fluxFrames - 1)));
+    const value = wasm.spectral_flux_wasm(
+      analysisPcm.subarray(previousOffset, previousOffset + analysisConfig.spectralFftSize),
+      analysisPcm.subarray(offset, offset + analysisConfig.spectralFftSize),
+    );
+    if (Number.isFinite(value)) flux.push(value);
+  }
   return {
     ...summarizeF0(f0),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
@@ -68,6 +92,11 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     spectralRolloff85Hz: Number.isFinite(rolloff85) ? rolloff85 : undefined,
     spectralRolloff95Hz: Number.isFinite(rolloff95) ? rolloff95 : undefined,
     spectralFlatness: Number.isFinite(flatness) ? flatness : undefined,
+    spectralSlopeDbPerKhz: Number.isFinite(slope) ? slope : undefined,
+    spectralFlux: flux.length ? flux.reduce((total, value) => total + value, 0) / flux.length : undefined,
+    lowBandEnergyRatio: Number.isFinite(bandEnergy[0]) ? bandEnergy[0] : undefined,
+    midBandEnergyRatio: Number.isFinite(bandEnergy[1]) ? bandEnergy[1] : undefined,
+    highBandEnergyRatio: Number.isFinite(bandEnergy[2]) ? bandEnergy[2] : undefined,
     hnrDb: hnr.length ? hnr.reduce((total, value) => total + value, 0) / hnr.length : undefined,
     frames: f0.length,
     spectrogram,

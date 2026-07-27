@@ -616,6 +616,28 @@ export function Recorder() {
                 <dd>{analysis.acousticFeatures.spectralFlatness.toFixed(3)}</dd>
               </div>
             )}
+            {analysis.acousticFeatures.spectralSlopeDbPerKhz !== undefined && (
+              <div>
+                <dt>스펙트럼 기울기</dt>
+                <dd>{analysis.acousticFeatures.spectralSlopeDbPerKhz.toFixed(1)}dB/kHz</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.spectralFlux !== undefined && (
+              <div>
+                <dt>스펙트럼 변화</dt>
+                <dd>{analysis.acousticFeatures.spectralFlux.toFixed(3)}</dd>
+              </div>
+            )}
+            {analysis.acousticFeatures.lowBandEnergyRatio !== undefined && (
+              <div>
+                <dt>대역 에너지</dt>
+                <dd>
+                  저음 {Math.round(analysis.acousticFeatures.lowBandEnergyRatio * 100)}% · 중음{" "}
+                  {Math.round((analysis.acousticFeatures.midBandEnergyRatio ?? 0) * 100)}% · 고음{" "}
+                  {Math.round((analysis.acousticFeatures.highBandEnergyRatio ?? 0) * 100)}%
+                </dd>
+              </div>
+            )}
             {analysis.acousticFeatures.hnrDb !== undefined && (
               <div>
                 <dt>HNR</dt>

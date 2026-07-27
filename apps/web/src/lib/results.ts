@@ -105,6 +105,11 @@ export function scalarCsv(result: LocalAnalysis) {
     spectralRolloff85Hz: result.acousticFeatures.spectralRolloff85Hz ?? "",
     spectralRolloff95Hz: result.acousticFeatures.spectralRolloff95Hz ?? "",
     spectralFlatness: result.acousticFeatures.spectralFlatness ?? "",
+    spectralSlopeDbPerKhz: result.acousticFeatures.spectralSlopeDbPerKhz ?? "",
+    spectralFlux: result.acousticFeatures.spectralFlux ?? "",
+    lowBandEnergyRatio: result.acousticFeatures.lowBandEnergyRatio ?? "",
+    midBandEnergyRatio: result.acousticFeatures.midBandEnergyRatio ?? "",
+    highBandEnergyRatio: result.acousticFeatures.highBandEnergyRatio ?? "",
     hnrDb: result.acousticFeatures.hnrDb ?? "",
     tisTrustworthyIntentScore: result.modelOutputs?.kind === "tis-trustworthy-intent" ? result.modelOutputs.score : "",
   };

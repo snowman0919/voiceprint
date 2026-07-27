@@ -18,6 +18,11 @@ export type DspSummary = {
   spectralRolloff85Hz?: number;
   spectralRolloff95Hz?: number;
   spectralFlatness?: number;
+  spectralSlopeDbPerKhz?: number;
+  spectralFlux?: number;
+  lowBandEnergyRatio?: number;
+  midBandEnergyRatio?: number;
+  highBandEnergyRatio?: number;
   hnrDb?: number;
   frames: number;
   spectrogram?: Spectrogram;
