@@ -8,7 +8,13 @@
 
 ## Current status
 
-No dataset has been downloaded in this repository. Kaggle credentials were unavailable during initial setup, so license, file structure, source audio presence, speaker IDs, label distribution, duplicates, and redistribution terms are unverified.
+### Download audit: 2026-07-28
+
+The declared Kaggle archive was downloaded locally with `make data-kaggle`; it is ignored by Git and is not in the Docker image. The public download command reported `Apache-2.0`, but the archive contains no `dataset-metadata.json` and the authenticated Kaggle metadata endpoint was unavailable in this environment. Therefore the exact license text, provenance, and redistribution/model-use terms are not yet recorded as verifiable local evidence.
+
+`make data-audit` found 16,148 mono 16 kHz WAV files and no unreadable WAV files. It found 1,078 exact-content duplicate groups containing 2,156 files. The directory labels are `male` and `female`; they are not perceived voice-impression labels. No trusted speaker manifest was found.
+
+Training remains blocked: first preserve authenticated Kaggle metadata and upstream license terms, remove or group duplicates by source speaker, establish speaker IDs, and obtain labels appropriate for the claimed output. The full local audit artifact contains per-file hashes and is intentionally not committed.
 
 Training is deliberately blocked until `make data-kaggle` and `make data-audit` complete and the resulting audit contains a declared license. If the audit reports `scalar_only`, only handcrafted-feature baselines may proceed; log-Mel CNN and hybrid waveform training remain blocked.
 

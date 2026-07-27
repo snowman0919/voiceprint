@@ -4,7 +4,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from voiceprint_ml.data_audit import audit_dataset, require_waveform_training
+from voiceprint_ml.data_audit import audit_dataset, audit_summary, require_waveform_training
 
 
 class DatasetAuditTest(unittest.TestCase):
@@ -35,6 +35,20 @@ class DatasetAuditTest(unittest.TestCase):
             self.assertEqual(len(audit.duplicate_files), 1)
             with self.assertRaisesRegex(RuntimeError, "Duplicate audio content"):
                 require_waveform_training(audit)
+
+    def test_summary_keeps_blocker_counts_without_dumping_every_file_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dataset-metadata.json").write_text(json.dumps({"licenseName": "CC-BY-4.0"}))
+            for name in ("a.wav", "b.wav"):
+                with wave.open(str(root / name), "wb") as output:
+                    output.setnchannels(1)
+                    output.setsampwidth(2)
+                    output.setframerate(16_000)
+                    output.writeframes(b"\0\0" * 16_000)
+            summary = audit_summary(audit_dataset(root))
+            self.assertEqual(summary["duplicate_groups"], 1)
+            self.assertNotIn("file_sha256", summary)
 
 
 if __name__ == "__main__":

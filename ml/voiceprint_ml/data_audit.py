@@ -143,6 +143,25 @@ def require_waveform_training(audit: DatasetAudit) -> None:
         raise RuntimeError(" ".join(audit.blockers))
 
 
+def audit_summary(audit: DatasetAudit) -> dict[str, object]:
+    """Keep CLI logs reviewable while the JSON artifact retains per-file evidence."""
+    return {
+        "root": audit.root,
+        "kind": audit.kind,
+        "audio_files": audit.audio_files,
+        "tabular_files": audit.tabular_files,
+        "metadata_license": audit.metadata_license,
+        "duplicate_groups": len(audit.duplicate_files),
+        "duplicate_files": sum(len(group) for group in audit.duplicate_files),
+        "unreadable_audio_files": len(audit.unreadable_audio),
+        "wav_sample_rates": audit.wav_sample_rates,
+        "wav_channels": audit.wav_channels,
+        "label_balance": audit.label_balance,
+        "trainable_waveform": audit.trainable_waveform,
+        "blockers": audit.blockers,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset", type=Path)
@@ -150,7 +169,7 @@ def main() -> None:
     arguments = parser.parse_args()
     audit = audit_dataset(arguments.dataset)
     arguments.output.write_text(json.dumps(asdict(audit), indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps(asdict(audit), ensure_ascii=False))
+    print(json.dumps(audit_summary(audit), ensure_ascii=False))
 
 
 if __name__ == "__main__":
