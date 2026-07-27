@@ -10,7 +10,22 @@ export function allowsAutoDownload(saveData: boolean | undefined) {
 export function validateManifest(value: unknown): value is ModelManifest {
   if (!value || typeof value !== "object") return false;
   const manifest = value as Partial<ModelManifest>;
-  return manifest.schemaVersion === 1 && (typeof manifest.activeModel === "string" || manifest.activeModel === null) && Array.isArray(manifest.models) && manifest.models.every((model) => typeof model.id === "string" && typeof model.version === "string" && typeof model.url === "string" && Number.isInteger(model.size) && /^[a-f0-9]{64}$/i.test(model.sha256));
+  if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.models) || (typeof manifest.activeModel !== "string" && manifest.activeModel !== null)) return false;
+  const validModel = (model: unknown): model is ModelEntry => {
+    if (!model || typeof model !== "object") return false;
+    const entry = model as Partial<ModelEntry>;
+    return typeof entry.id === "string" && entry.id.length > 0
+      && typeof entry.version === "string" && entry.version.length > 0
+      && typeof entry.url === "string" && entry.url.startsWith("/models/")
+      && typeof entry.size === "number" && Number.isInteger(entry.size) && entry.size > 0
+      && typeof entry.sha256 === "string" && /^[a-f0-9]{64}$/i.test(entry.sha256)
+      && typeof entry.inputSampleRate === "number" && Number.isInteger(entry.inputSampleRate) && entry.inputSampleRate > 0
+      && typeof entry.inputSeconds === "number" && Number.isInteger(entry.inputSeconds) && entry.inputSeconds > 0 && entry.inputSeconds <= 60
+      && typeof entry.opset === "number" && Number.isInteger(entry.opset) && entry.opset > 0
+      && typeof entry.quantization === "string" && entry.quantization.length > 0
+      && typeof entry.minimumAppVersion === "string" && entry.minimumAppVersion.length > 0;
+  };
+  return manifest.models.every(validModel) && (manifest.activeModel === null || manifest.models.some((model) => model.id === manifest.activeModel));
 }
 
 export async function loadManifest() {
