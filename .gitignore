@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+dist/
+target/
+__pycache__/
+.venv/
+.env
+.env.*
+!.env.example
+data/
+checkpoints/
+artifacts/
+kaggle.json
+.DS_Store
