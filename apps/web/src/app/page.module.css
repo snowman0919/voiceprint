@@ -9,3 +9,5 @@
 .main button:hover { background: #263a63; }
 .main button:focus-visible { outline: 3px solid #73a5ff; outline-offset: 3px; }
 .note { max-width: 440px; }
+
+@media (max-width: 600px) { .main { gap: 20px; } }

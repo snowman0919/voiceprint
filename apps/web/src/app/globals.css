@@ -3,3 +3,20 @@
 html, body { min-height: 100%; }
 body { min-height: 100svh; display: grid; place-items: center; padding: 32px; color: var(--foreground); background: var(--background); font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
 button { font-size: inherit; }
+.recorder { display: grid; gap: 16px; margin-top: 32px; padding-top: 32px; border-top: 1px solid #d9e0e8; }
+.recorder h2 { font-size: 28px; letter-spacing: -.04em; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #52606d; }
+.prompt, .metadata { color: #52606d; line-height: 1.55; }
+.meter { height: 8px; overflow: hidden; background: #d9e0e8; }
+.meter span { display: block; width: 100%; height: 100%; transform-origin: left; background: #2b7a78; transition: transform 80ms linear; }
+.time { color: #52606d; font-variant-numeric: tabular-nums; }
+.recorder button, .file { width: fit-content; border: 0; border-radius: 4px; padding: 12px 16px; background: #14213d; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.recorder button:disabled { background: #9aa8b8; cursor: not-allowed; }
+.file { background: transparent; border: 1px solid #aab5c2; color: #14213d; }
+.file input { display: none; }
+.warning, .error { padding: 12px; line-height: 1.5; background: #fff4e5; color: #8a4b08; }
+.error { background: #fff0f0; color: #a12424; }
+.quality { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #d9e0e8; border: 1px solid #d9e0e8; }
+.quality div { padding: 12px; background: #fff; }
+.quality dt { color: #52606d; font-size: 13px; }
+.quality dd { margin-top: 4px; font-weight: 700; }

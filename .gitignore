@@ -13,3 +13,4 @@ checkpoints/
 artifacts/
 kaggle.json
 .DS_Store
+.playwright-cli/

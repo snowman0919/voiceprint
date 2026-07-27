@@ -1,4 +1,5 @@
 import styles from "./page.module.css";
+import { Recorder } from "@/features/recording/recorder";
 
 export default function Home() {
   return (
@@ -16,9 +17,8 @@ export default function Home() {
         </div>
       </section>
       <button type="button">분석 모델 받기</button>
-      <p className={styles.note}>
-        확률이나 진단이 아닌, 녹음된 목소리의 음향적 경향을 보여줍니다.
-      </p>
+      <p className={styles.note}>확률이나 진단이 아닌, 녹음된 목소리의 음향적 경향을 보여줍니다.</p>
+      <Recorder />
     </main>
   );
 }
