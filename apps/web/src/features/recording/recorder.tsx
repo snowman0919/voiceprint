@@ -45,6 +45,7 @@ export function Recorder() {
 
   async function inspectPcm(pcm: Float32Array, sampleRate: number, source: string) {
     setState("checking");
+    setAnalysis(undefined);
     try {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>((resolve, reject) => {
         const worker = new Worker(new URL("../../workers/quality.worker.ts", import.meta.url));
