@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { brand } from "@/lib/brand";
 
-export const metadata = { title: "개인정보처리방침 | Voiceprint" };
+export const metadata = { title: `개인정보처리방침 | ${brand.name}` };
 
 export default function PrivacyPage() {
   return (
     <main className="document">
-      <Link href="/">Voiceprint</Link>
+      <Link href="/">{brand.name}</Link>
       <p className="eyebrow">개인정보처리방침</p>
       <h1>음성은 이 기기를 벗어나지 않습니다.</h1>
       <p>시행일: 배포 전 확정</p>

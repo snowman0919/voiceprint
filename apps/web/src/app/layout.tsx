@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Voiceprint | 온디바이스 음성 분석",
-  description: "음성은 이 기기를 벗어나지 않습니다.",
+  title: `${brand.name} | 온디바이스 음성 분석`,
+  description: brand.privacyPromise,
 };
 
 export default function RootLayout({
