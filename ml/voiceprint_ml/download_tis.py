@@ -104,9 +104,9 @@ def write_manifest(output: Path) -> None:
 
 def download_tis(output: Path) -> None:
     files = remote_files(ROOT_FILES)
-    # OSF's public download endpoint rate-limits bursty clients.  Two workers
+    # OSF's public download endpoint rate-limits bursty clients.  Four workers
     # allow resumable progress without turning a transient 429 into a failure.
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         list(executor.map(lambda remote: download(remote.download_url, output / remote.relative_path), files))
     (output / "dataset-metadata.json").write_text(
         json.dumps(
