@@ -76,7 +76,7 @@ def evaluate_baselines(manifest: Path, root: Path, output: Path, seed: int = 202
     test_features, test_labels = splits["test"]
     models = {
         "logistic_regression": make_pipeline(StandardScaler(), LogisticRegression(max_iter=2_000, random_state=seed)),
-        "svm_rbf": make_pipeline(StandardScaler(), SVC(kernel="rbf", probability=False, random_state=seed)),
+        "svm_rbf": make_pipeline(StandardScaler(), SVC(kernel="rbf", random_state=seed)),
         "random_forest": RandomForestClassifier(n_estimators=300, min_samples_leaf=3, n_jobs=-1, random_state=seed),
     }
     metrics: dict[str, dict[str, float]] = {}
