@@ -15,7 +15,7 @@ class VoiceImpressionNet(nn.Module):
         super().__init__()
         channels = (1, 24, 48, 96, 128)
         layers: list[nn.Module] = []
-        for source, target in zip(channels, channels[1:], strict=True):
+        for source, target in zip(channels[:-1], channels[1:], strict=True):
             layers.extend((
                 nn.Conv1d(source, target, kernel_size=9, stride=4, padding=4, bias=False),
                 nn.BatchNorm1d(target),

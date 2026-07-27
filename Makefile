@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -59,6 +59,9 @@ split-tis:
 
 train:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.train --manifest ml/data/approved/manifest.csv --data-root ml/data/approved
+
+train-tis:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.tis_model
 
 export-onnx:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
