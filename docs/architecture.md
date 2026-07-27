@@ -10,7 +10,7 @@ microphone/file -> AudioWorklet or local decoder -> Quality Worker -> Rust/WASM 
 
 Audio samples, PCM, trajectories, embeddings, and analysis results remain in browser memory. A user-selected model is fetched as a static asset, SHA-256 checked, then stored in Cache Storage. The result share payload is compressed into the URL fragment, which HTTP requests do not send to the static host.
 
-The model manifest is intentionally empty until an approved dataset, reproducible checkpoint, ONNX export, checksum, and validation record exist. The app still offers local acoustic measurements without presenting them as a trained impression model.
+The source checkout keeps the model manifest empty because generated checkpoints and ONNX files are not committed. A deployment build runs `make train-tis` and `make sync-tis-model` first; this creates a checksum manifest for the local TIS recording-condition model. Without that generated artifact, the app still offers local acoustic measurements without presenting them as a trained model.
 
 ## Execution boundaries
 
