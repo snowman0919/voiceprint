@@ -2,10 +2,24 @@
   "status": "permission_required",
   "data_access": "manual_and_pseudo_annotations_must_not_be_read_until_rights_are_verified",
   "evaluation": {
-    "outer_protocols": ["repeated_grouped_5_fold_oof", "leave_one_out_oof", "nested_grouped_cross_validation", "bootstrap_confidence_interval"],
+    "outer_protocols": [
+      "repeated_grouped_5_fold_oof",
+      "leave_one_out_oof",
+      "nested_grouped_cross_validation",
+      "bootstrap_confidence_interval"
+    ],
     "manual_only_for_final_evaluation": true,
     "pseudo_label_uses": ["teacher_student", "pretraining", "consistency_regularization", "representation_learning"],
-    "models": ["descriptor_mean", "ridge", "elastic_net", "ordinal_regression", "handcrafted_mlp", "frozen_embedding_linear", "frozen_embedding_small_mlp", "fusion"],
+    "models": [
+      "descriptor_mean",
+      "ridge",
+      "elastic_net",
+      "ordinal_regression",
+      "handcrafted_mlp",
+      "frozen_embedding_linear",
+      "frozen_embedding_small_mlp",
+      "fusion"
+    ],
     "full_encoder_finetuning": false
   }
 }

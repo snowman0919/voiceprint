@@ -8,3 +8,4 @@ apps/web/public/og.svg
 fixtures/audio/
 ml/uv.lock
 pnpm-lock.yaml
+ml/licenses/source/

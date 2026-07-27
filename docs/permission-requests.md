@@ -4,12 +4,12 @@ Do not send automatically.
 
 ## Contact matrix
 
-| Asset | Rights contact | Corresponding-author contact | Maintainer route | Status |
-| --- | --- | --- | --- | --- |
-| LibriTTS-VI | unknown | unknown from audited repository | [GitHub Issues](https://github.com/sony/LibriTTS-VI/issues) | permission required |
-| VCTK-RVA annotations | unknown | authors listed in [vTAD paper](https://arxiv.org/abs/2505.09661); corresponding author not verified | [GitHub Issues](https://github.com/vTAD2025-Challenge/vTAD/issues) | permission required |
-| vTAD baseline code | unknown | unknown | [GitHub Issues](https://github.com/vTAD2025-Challenge/vTAD/issues) | permission required |
-| VCTK 0.92 original corpus | University of Edinburgh CSTR; corpus README lists Junichi Yamagishi | `jyamagis@inf.ed.ac.uk` appears in official VCTK 0.92 README | official DOI record | CC BY 4.0 recorded; no request drafted |
+| Asset                     | Rights contact                                                      | Corresponding-author contact                                                                        | Maintainer route                                                   | Status                                 |
+| ------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| LibriTTS-VI               | unknown                                                             | unknown from audited repository                                                                     | [GitHub Issues](https://github.com/sony/LibriTTS-VI/issues)        | permission required                    |
+| VCTK-RVA annotations      | unknown                                                             | authors listed in [vTAD paper](https://arxiv.org/abs/2505.09661); corresponding author not verified | [GitHub Issues](https://github.com/vTAD2025-Challenge/vTAD/issues) | permission required                    |
+| vTAD baseline code        | unknown                                                             | unknown                                                                                             | [GitHub Issues](https://github.com/vTAD2025-Challenge/vTAD/issues) | permission required                    |
+| VCTK 0.92 original corpus | University of Edinburgh CSTR; corpus README lists Junichi Yamagishi | `jyamagis@inf.ed.ac.uk` appears in official VCTK 0.92 README                                        | official DOI record                                                | CC BY 4.0 recorded; no request drafted |
 
 No personal contact detail is inferred from a paper or repository. Resolve unknown corresponding-author addresses from an official paper page or use the GitHub issue route.
 

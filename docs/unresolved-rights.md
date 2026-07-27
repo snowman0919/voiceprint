@@ -14,12 +14,12 @@ CC BY 4.0 requires attribution and does not impose ShareAlike. It permits licens
 
 ## Blocking rights
 
-| Asset | What is missing | Required before use |
-| --- | --- | --- |
-| LibriTTS-VI manual annotations | Explicit license or written permission | Research training, derived cache, annotation redistribution, model weights, public service |
-| LibriTTS-VI pseudo annotations | Explicit license or written permission; confirmation whether terms differ | Any pseudo-label training or representation-learning cache |
-| VCTK-RVA annotations | Explicit license or written permission | Pairwise training, derived cache, checkpoint publication, public service |
-| vTAD baseline code | Source-code license or written permission | Copying, modification, redistribution, or checkpoint distribution derived from it |
+| Asset                          | What is missing                                                           | Required before use                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| LibriTTS-VI manual annotations | Explicit license or written permission                                    | Research training, derived cache, annotation redistribution, model weights, public service |
+| LibriTTS-VI pseudo annotations | Explicit license or written permission; confirmation whether terms differ | Any pseudo-label training or representation-learning cache                                 |
+| VCTK-RVA annotations           | Explicit license or written permission                                    | Pairwise training, derived cache, checkpoint publication, public service                   |
+| vTAD baseline code             | Source-code license or written permission                                 | Copying, modification, redistribution, or checkpoint distribution derived from it          |
 
 At the audited commits, both GitHub API `license` fields were `null`, and neither checkout contained `LICENSE` or `COPYING`. Hence all fields above remain `unknown` / `permission_required`. No actual annotations or vTAD source code are imported into this repository; cloned copies are ignored local audit material.
 

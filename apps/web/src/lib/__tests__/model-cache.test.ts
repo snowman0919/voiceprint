@@ -36,7 +36,9 @@ describe("model manifest validation", () => {
   });
 
   it("keeps a synthetic unlicensed descriptor out of browser report inference", () => {
-    expect(validateManifest({ schemaVersion: 1, activeModel: blockedResearchModel.id, models: [blockedResearchModel] })).toBe(false);
+    expect(
+      validateManifest({ schemaVersion: 1, activeModel: blockedResearchModel.id, models: [blockedResearchModel] }),
+    ).toBe(false);
   });
 
   it("rejects an active report model without a release-evidence digest", () => {

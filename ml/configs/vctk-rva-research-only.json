@@ -4,6 +4,20 @@
   "splits": ["official_train", "official_seen", "official_unseen"],
   "ordered_pair_invariant": "right_speaker_stronger",
   "tie_policy": "ties_require_explicit_non_ordered_schema",
-  "models": ["handcrafted_difference", "frozen_embedding_difference", "siamese_mlp", "descriptor_conditioned_difference"],
-  "metrics": ["overall_accuracy", "descriptor_macro_accuracy", "seen_accuracy", "unseen_accuracy", "eer", "bootstrap_confidence_interval", "descriptor_confusion", "speaker_leakage_audit"]
+  "models": [
+    "handcrafted_difference",
+    "frozen_embedding_difference",
+    "siamese_mlp",
+    "descriptor_conditioned_difference"
+  ],
+  "metrics": [
+    "overall_accuracy",
+    "descriptor_macro_accuracy",
+    "seen_accuracy",
+    "unseen_accuracy",
+    "eer",
+    "bootstrap_confidence_interval",
+    "descriptor_confusion",
+    "speaker_leakage_audit"
+  ]
 }
