@@ -38,6 +38,12 @@ Any `male`/`female` speaker label is not a perceived voice-impression label. It 
 
 ## Investigated but not approved
 
+### Palette of Voices (Munson & Dolquist 2025)
+
+The official [OSF project](https://osf.io/n3twm/) declares CC BY 4.0 and explicitly says that speakers consented to open-access sharing of the stimuli. It provides 240 English WAV stimuli from 20 documented speakers, an XLSX summary of human listener-group perception rates, and source-derived acoustic measures. `make data-palette` downloads only those official files into ignored local storage; it creates a `perception-manifest.csv` that preserves the source speaker IDs and separate perceived `Man`/`Woman` percentages for the three listener groups (cisgender heterosexual women, cisgender heterosexual men, and gender/sexuality-expansive listeners). `make data-palette-audit` checks its audio and duplicate content.
+
+This is a purpose-aligned research candidate, but it is **not** a report model dataset: its 20 speakers are too few for a robust held-out-speaker production claim, and its category-selection percentages are not independent continuous masculinity/femininity ratings. It is never converted into speaker identity or biological-sex labels, and it must not activate a user-report model without a larger, purpose-specific consented multi-rater dataset and a documented held-out evaluation.
+
 ### LibriTTS-VI
 
 The official [Sony LibriTTS-VI repository](https://github.com/sony/LibriTTS-VI) publishes 130 utterances with four professional raters across ten subjective voice-impression scales, plus estimated 11-dimensional values for LibriTTS-R. This is a promising source for a future, more specific impression model. However, its repository has no declared license, and the underlying LibriTTS-R audio has separate provenance and terms. Therefore it has not been downloaded or used for training. Estimated labels also must not be presented as equivalent to the 130 manually rated examples.

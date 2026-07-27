@@ -67,6 +67,15 @@ make split-tis
 
 TIS의 `trustworthy`/`neutral`은 화자가 의도해 낸 녹음 조건일 뿐, 청취자가 평가한 보편적 인상이나 사람의 신뢰성·성격을 뜻하지 않습니다.
 
+목적에 가까운 후보로 [Palette of Voices](https://osf.io/n3twm/)의 CC BY 4.0 공개 자극과 사람 청취자 평가 요약도 재현 가능하게 받을 수 있습니다.
+
+```sh
+make data-palette
+make data-palette-audit
+```
+
+이 자료는 20명 화자의 범주형 지각 비율만 포함하므로, 현재 사용자 보고서 모델 학습이나 manifest 활성화에는 사용할 수 없습니다. 화자 수가 더 큰 동의 기반 다중 평가자 연속 평점 데이터와 held-out 화자 평가가 확인되기 전까지 앱은 측정값과 결정론적 규칙만 표시합니다.
+
 학습과 브라우저용 모델 생성은 다음과 같습니다. 생성된 모델을 포함한 정적 배포 빌드는 이후 `make build`로 만듭니다.
 
 ```sh

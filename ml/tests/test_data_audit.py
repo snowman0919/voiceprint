@@ -19,6 +19,13 @@ class DatasetAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "waveform CNN"):
                 require_waveform_training(audit)
 
+    def test_records_label_balance_when_a_manifest_defines_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dataset-metadata.json").write_text(json.dumps({"licenseName": "CC-BY-4.0"}))
+            (root / "voice.csv").write_text("speaker_id,label\n001,man\n002,woman\n003,man\n")
+            self.assertEqual(audit_dataset(root).label_balance, {"man": 2, "woman": 1})
+
     def test_duplicate_wav_content_blocks_training_before_split(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

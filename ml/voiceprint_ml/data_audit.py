@@ -60,6 +60,19 @@ def _wav_metadata(path: Path) -> tuple[int, int, float]:
 def _label_balance(path: Path | None) -> dict[str, int]:
     if not path:
         return {}
+    try:
+        with path.open(encoding="utf-8", newline="") as source:
+            rows = csv.DictReader(source)
+            if not rows.fieldnames or "label" not in rows.fieldnames:
+                return {}
+            counts: dict[str, int] = {}
+            for row in rows:
+                label = row.get("label")
+                if label:
+                    counts[label] = counts.get(label, 0) + 1
+            return counts
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return {}
 
 
 def _speaker_count(files: list[Path]) -> int:
@@ -75,19 +88,6 @@ def _speaker_count(files: list[Path]) -> int:
         except (OSError, UnicodeDecodeError, csv.Error):
             continue
     return 0
-    try:
-        with path.open(encoding="utf-8", newline="") as source:
-            rows = csv.DictReader(source)
-            if not rows.fieldnames or "label" not in rows.fieldnames:
-                return {}
-            counts: dict[str, int] = {}
-            for row in rows:
-                label = row.get("label")
-                if label:
-                    counts[label] = counts.get(label, 0) + 1
-            return counts
-    except (OSError, UnicodeDecodeError, csv.Error):
-        return {}
 
 
 def audit_dataset(root: Path) -> DatasetAudit:
