@@ -1,0 +1,11 @@
+.git
+.next
+out
+target
+node_modules
+ml/data
+ml/.venv
+checkpoints
+artifacts
+.env
+.DS_Store

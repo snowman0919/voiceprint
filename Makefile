@@ -1,4 +1,4 @@
-.PHONY: build-wasm test-wasm lint typecheck test-web test-python data-kaggle data-audit build
+.PHONY: build-wasm test-wasm lint typecheck test-web test-python data-kaggle data-audit docker-build docker-run build
 
 build-wasm:
 	./scripts/build-wasm.sh
@@ -23,6 +23,12 @@ data-kaggle:
 
 data-audit:
 	PYTHONPATH=ml python3 -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json
+
+docker-build:
+	docker build --tag voiceprint:local .
+
+docker-run:
+	docker run --rm --publish 8080:8080 voiceprint:local
 
 build: build-wasm
 	pnpm --dir apps/web build
