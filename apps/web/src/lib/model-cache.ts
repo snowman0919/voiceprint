@@ -20,6 +20,8 @@ export async function cachedModel(model: ModelEntry) {
   return (await caches.open(cacheName)).match(model.url);
 }
 
+export async function clearModelCache() { await caches.delete(cacheName); }
+
 function hex(bytes: ArrayBuffer) { return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join(""); }
 
 export async function downloadAndVerify(model: ModelEntry, onProgress: (received: number) => void, signal?: AbortSignal) {
