@@ -19,6 +19,8 @@ def verify_manifest(manifest_path: Path, public_root: Path) -> dict[str, int]:
     for model in models:
         if not isinstance(model, dict) or not isinstance(model.get("url"), str) or not model["url"].startswith("/models/"):
             raise ValueError("model URL must remain under /models/")
+        if not isinstance(model.get("reportEligible"), bool):
+            raise ValueError("model report eligibility must be explicit")
         artifact = public_root / model["url"].lstrip("/")
         if not artifact.is_file():
             raise ValueError(f"model artifact is missing: {artifact}")
@@ -27,6 +29,8 @@ def verify_manifest(manifest_path: Path, public_root: Path) -> dict[str, int]:
             raise ValueError(f"model size does not match: {artifact}")
         if model.get("sha256") != hashlib.sha256(payload).hexdigest():
             raise ValueError(f"model SHA-256 does not match: {artifact}")
+    if active is not None and not next(model["reportEligible"] for model in models if model["id"] == active):
+        raise ValueError("a non-report model cannot be active")
     return {"models": len(models), "active": int(active is not None)}
 
 

@@ -18,6 +18,7 @@ def create_manifest(
     opset: int,
     quantization: str,
     minimum_app_version: str,
+    report_eligible: bool = False,
 ) -> dict[str, object]:
     if not model.is_file() or model.suffix != ".onnx":
         raise ValueError("an existing .onnx artifact is required")
@@ -26,7 +27,7 @@ def create_manifest(
     payload = model.read_bytes()
     return {
         "schemaVersion": 1,
-        "activeModel": model_id,
+        "activeModel": model_id if report_eligible else None,
         "models": [{
             "id": model_id,
             "version": version,
@@ -38,6 +39,7 @@ def create_manifest(
             "opset": opset,
             "quantization": quantization,
             "minimumAppVersion": minimum_app_version,
+            "reportEligible": report_eligible,
         }],
     }
 
@@ -53,6 +55,11 @@ def main() -> None:
     parser.add_argument("--opset", type=int, default=18)
     parser.add_argument("--quantization", default="none")
     parser.add_argument("--minimum-app-version", default="0.1.0")
+    parser.add_argument(
+        "--report-eligible",
+        action="store_true",
+        help="activate only a purpose-audited model for user reports",
+    )
     arguments = parser.parse_args()
     manifest = create_manifest(
         arguments.model,
@@ -63,6 +70,7 @@ def main() -> None:
         opset=arguments.opset,
         quantization=arguments.quantization,
         minimum_app_version=arguments.minimum_app_version,
+        report_eligible=arguments.report_eligible,
     )
     arguments.output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest))

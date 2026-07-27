@@ -9,6 +9,8 @@ export type ModelEntry = {
   opset: number;
   quantization: string;
   minimumAppVersion: string;
+  /** True only after the data audit and held-out evaluation approve this report purpose. */
+  reportEligible: boolean;
 };
 export type ModelManifest = { schemaVersion: 1; activeModel: string | null; models: ModelEntry[] };
 
@@ -55,12 +57,14 @@ export function validateManifest(value: unknown): value is ModelManifest {
       typeof entry.quantization === "string" &&
       entry.quantization.length > 0 &&
       typeof entry.minimumAppVersion === "string" &&
-      entry.minimumAppVersion.length > 0
+      entry.minimumAppVersion.length > 0 &&
+      typeof entry.reportEligible === "boolean"
     );
   };
   return (
     manifest.models.every(validModel) &&
-    (manifest.activeModel === null || manifest.models.some((model) => model.id === manifest.activeModel))
+    (manifest.activeModel === null ||
+      manifest.models.some((model) => model.id === manifest.activeModel && model.reportEligible))
   );
 }
 
