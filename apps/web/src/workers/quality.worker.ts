@@ -1,16 +1,11 @@
 import { inspectAudio } from "@/lib/audio-quality";
-import type { DspSummary } from "@/lib/dsp";
+import { summarizeF0, type DspSummary } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number };
 type Stage = "input" | "pitch" | "timbre" | "finalizing";
 
 function stage(value: Stage) { self.postMessage({ type: "stage", value }); }
-
-function percentile(values: number[], fraction: number) {
-  const index = Math.min(values.length - 1, Math.max(0, Math.round((values.length - 1) * fraction)));
-  return values[index];
-}
 
 async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSummary> {
   const wasm = await import("@/generated/voice_dsp.js");
@@ -29,7 +24,6 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     const hnrValue = wasm.hnr_db(analysisPcm.subarray(offset, offset + frameSize), analysisSampleRate);
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
   }
-  f0.sort((left, right) => left - right);
   stage("timbre");
   const centroidFrame = analysisPcm.subarray(0, Math.min(1024, analysisPcm.length));
   const centroid = centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
@@ -38,9 +32,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   const rolloff95 = centroidFrame.length === 1024 ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate) : Number.NaN;
   const flatness = centroidFrame.length === 1024 ? wasm.spectral_flatness(centroidFrame, analysisSampleRate) : Number.NaN;
   return {
-    f0MedianHz: f0.length ? percentile(f0, 0.5) : undefined,
-    f0P05Hz: f0.length ? percentile(f0, 0.05) : undefined,
-    f0P95Hz: f0.length ? percentile(f0, 0.95) : undefined,
+    ...summarizeF0(f0),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
     spectralBandwidthHz: Number.isFinite(bandwidth) ? bandwidth : undefined,
     spectralRolloff85Hz: Number.isFinite(rolloff85) ? rolloff85 : undefined,
