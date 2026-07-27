@@ -8,7 +8,7 @@ make docker-build
 docker run --rm -p 8080:8080 voiceprint:local
 ```
 
-`sync-tis-model` is intentionally a local release step: it creates the ignored ONNX asset and rewrites the static model manifest with its SHA-256. Do not build a release image with a manifest that refers to absent model bytes. The source checkout's empty manifest remains valid for the acoustic-measurement-only mode.
+`sync-tis-model` is intentionally a local release step: it creates the ignored ONNX asset, rewrites the static model manifest with its SHA-256, then verifies the URL, file size, and digest against exact local bytes. Do not build a release image with a manifest that refers to absent model bytes. The source checkout's empty manifest remains valid for the acoustic-measurement-only mode.
 
 The image builds Rust/WASM and Next static export in separate build stages. Its runtime stage contains Nginx and exported assets only: no Node.js, Python, training data, Kaggle credentials, checkpoints, or Rust compiler. The optional generated ONNX static asset is the only model-related runtime file.
 

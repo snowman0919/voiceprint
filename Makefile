@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-formants sync-model sync-tis-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-model-manifest validate-formants sync-model sync-tis-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -84,13 +84,16 @@ validate-onnx:
 validate-tis-onnx:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.tis_onnx validate ml/checkpoints/tis-intent-v1.pt apps/web/public/models/tis-intent-v1.onnx
 
+validate-model-manifest:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.verify_manifest
+
 validate-formants:
 	@test -n "$(FORMANT_WAV)" || (echo "Set FORMANT_WAV to a WAV path."; exit 2)
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.validate_formants "$(FORMANT_WAV)"
 
-sync-model: validate-onnx model-manifest
+sync-model: validate-onnx model-manifest validate-model-manifest
 
-sync-tis-model: export-tis-onnx validate-tis-onnx model-manifest-tis
+sync-tis-model: export-tis-onnx validate-tis-onnx model-manifest-tis validate-model-manifest
 
 benchmark: benchmark-dsp
 
@@ -100,7 +103,7 @@ docker-build:
 docker-run:
 	docker run --rm --publish 8080:8080 voiceprint:local
 
-verify: lint typecheck test docker-build
+verify: lint typecheck test validate-model-manifest docker-build
 
 build: build-wasm
 	pnpm --dir apps/web build
