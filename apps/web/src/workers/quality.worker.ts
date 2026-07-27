@@ -1,4 +1,5 @@
 import { inspectAudio } from "@/lib/audio-quality";
+import { analysisConfig } from "@/lib/analysis-config";
 import { summarizeF0, type DspSummary } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
@@ -12,10 +13,10 @@ function stage(value: Stage) {
 async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSummary> {
   const wasm = await import("@/generated/voice_dsp.js");
   await wasm.default(new URL("/wasm/voice_dsp_bg.wasm", self.location.origin));
-  const analysisPcm = sampleRate === 24_000 ? pcm : wasm.resample_to_24khz(pcm, sampleRate);
-  const analysisSampleRate = 24_000;
-  const frameSize = Math.round(analysisSampleRate * 0.08);
-  const frameCount = Math.min(20, Math.floor(analysisPcm.length / frameSize));
+  const analysisPcm = sampleRate === analysisConfig.sampleRate ? pcm : wasm.resample_to_24khz(pcm, sampleRate);
+  const analysisSampleRate = analysisConfig.sampleRate;
+  const frameSize = Math.round(analysisSampleRate * analysisConfig.f0FrameSeconds);
+  const frameCount = Math.min(analysisConfig.maxSummaryFrames, Math.floor(analysisPcm.length / frameSize));
   const f0: number[] = [];
   const hnr: number[] = [];
   stage("pitch");
@@ -27,17 +28,27 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
   }
   stage("timbre");
-  const centroidFrame = analysisPcm.subarray(0, Math.min(1024, analysisPcm.length));
+  const centroidFrame = analysisPcm.subarray(0, Math.min(analysisConfig.spectralFftSize, analysisPcm.length));
   const centroid =
-    centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate)
+      : Number.NaN;
   const bandwidth =
-    centroidFrame.length === 1024 ? wasm.spectral_bandwidth_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_bandwidth_hz(centroidFrame, analysisSampleRate)
+      : Number.NaN;
   const rolloff85 =
-    centroidFrame.length === 1024 ? wasm.spectral_rolloff_85_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_rolloff_85_hz(centroidFrame, analysisSampleRate)
+      : Number.NaN;
   const rolloff95 =
-    centroidFrame.length === 1024 ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate)
+      : Number.NaN;
   const flatness =
-    centroidFrame.length === 1024 ? wasm.spectral_flatness(centroidFrame, analysisSampleRate) : Number.NaN;
+    centroidFrame.length === analysisConfig.spectralFftSize
+      ? wasm.spectral_flatness(centroidFrame, analysisSampleRate)
+      : Number.NaN;
   return {
     ...summarizeF0(f0),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
