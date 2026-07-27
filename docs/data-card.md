@@ -8,6 +8,16 @@
 
 ## Current status
 
+### Licensed bounded-label source: 2026-07-28
+
+- Dataset: *Human voices communicating trustworthy intent: A demographically diverse speech audio dataset* (TIS)
+- Official source: https://osf.io/45d8j/
+- License: CC BY 4.0, declared by the dataset README for the project, WAVs, and CSV files.
+- Citation: Maltezou-Papastylianou, C., Scherer, R. & Paulmann, S. (2025). *Scientific Data*, 12, 921. https://doi.org/10.1038/s41597-025-05267-3
+- Contents declared by the accompanying publication: 1,152 English, 48 kHz mono WAVs from 96 speakers, with each speaker recording neutral and speaker-produced trustworthy-intent utterances.
+
+`make data-tis` retrieves this corpus directly from the official OSF node into ignored local storage. `make data-tis-audit` and `make split-tis` respectively record content integrity and produce a speaker-disjoint split. The label is a recording condition — a speaker's attempted trustworthy intent — not listener-rated general trustworthiness, personality, or a trait of the person speaking. It may only support a model and UI wording scoped to that recording condition; it cannot validate the app's broader voice-impression outputs.
+
 ### Download audit: 2026-07-28
 
 The declared Kaggle archive was downloaded locally with `make data-kaggle`; it is ignored by Git and is not in the Docker image. The [public Kaggle listing](https://www.kaggle.com/datasets/murtadhanajim/gender-recognition-by-voiceoriginal) and download command report `Apache-2.0` (accessed 2026-07-28). The listing also says the source was obtained online through a reference link; the archive contains no `dataset-metadata.json` and the authenticated Kaggle metadata endpoint was unavailable in this environment. Therefore the upstream source license, provenance, and redistribution/model-use terms are not yet independently recorded as verifiable evidence.

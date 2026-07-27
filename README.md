@@ -12,7 +12,7 @@
 - Docker/Nginx 정적 런타임, CSP·COOP·COEP·Permissions Policy
 - Playwright E2E로 로컬 파일 분석 중 외부 요청과 write request가 없음을 검증
 
-학습 모델은 아직 배포하지 않았습니다. Kaggle 데이터의 라이선스·원본 오디오·화자 ID를 확인하기 전에는 학습과 인상 예측을 의도적으로 차단합니다.
+학습 모델은 아직 배포하지 않았습니다. Kaggle 데이터는 라이선스·원본 오디오·화자 ID를 검증하기 전까지 학습에 사용하지 않습니다. 별도로 공식 OSF에서 CC BY 4.0으로 배포한 TIS 코퍼스는 `trustworthy intent`라는 한정된 녹음 조건 연구용으로만 감사·학습 후보입니다. 이는 일반적인 신뢰성·성격·개인 특성의 판정이 아닙니다.
 
 ## 구조
 
@@ -56,6 +56,16 @@ make split
 ```
 
 감사는 license와 파일 형식을 검사합니다. `scalar_only` 데이터는 waveform CNN/hybrid 학습으로 진입할 수 없으며, speaker ID 없는 데이터는 speaker-disjoint split을 만들 수 없습니다. 모델 라벨과 사용자가 지각한 음성 인상은 동일하지 않습니다.
+
+공식 OSF의 [TIS 코퍼스](https://osf.io/45d8j/)는 CC BY 4.0으로 공개된 1,152개 녹음·96명 화자 데이터입니다. 다음 명령은 로컬 무시 경로에 내려받고, 화자 분리 학습 준비 상태를 감사합니다.
+
+```sh
+make data-tis
+make data-tis-audit
+make split-tis
+```
+
+TIS의 `trustworthy`/`neutral`은 화자가 의도해 낸 녹음 조건일 뿐, 청취자가 평가한 보편적 인상이나 사람의 신뢰성·성격을 뜻하지 않습니다.
 
 승인된 데이터가 준비된 뒤의 결정론적 학습·held-out 평가·ONNX export 절차는 [docs/training.md](docs/training.md)를 따릅니다.
 
