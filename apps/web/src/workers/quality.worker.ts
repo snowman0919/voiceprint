@@ -33,11 +33,19 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   stage("timbre");
   const centroidFrame = analysisPcm.subarray(0, Math.min(1024, analysisPcm.length));
   const centroid = centroidFrame.length === 1024 ? wasm.spectral_centroid_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const bandwidth = centroidFrame.length === 1024 ? wasm.spectral_bandwidth_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const rolloff85 = centroidFrame.length === 1024 ? wasm.spectral_rolloff_85_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const rolloff95 = centroidFrame.length === 1024 ? wasm.spectral_rolloff_95_hz(centroidFrame, analysisSampleRate) : Number.NaN;
+  const flatness = centroidFrame.length === 1024 ? wasm.spectral_flatness(centroidFrame, analysisSampleRate) : Number.NaN;
   return {
     f0MedianHz: f0.length ? percentile(f0, 0.5) : undefined,
     f0P05Hz: f0.length ? percentile(f0, 0.05) : undefined,
     f0P95Hz: f0.length ? percentile(f0, 0.95) : undefined,
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
+    spectralBandwidthHz: Number.isFinite(bandwidth) ? bandwidth : undefined,
+    spectralRolloff85Hz: Number.isFinite(rolloff85) ? rolloff85 : undefined,
+    spectralRolloff95Hz: Number.isFinite(rolloff95) ? rolloff95 : undefined,
+    spectralFlatness: Number.isFinite(flatness) ? flatness : undefined,
     hnrDb: hnr.length ? hnr.reduce((total, value) => total + value, 0) / hnr.length : undefined,
     frames: f0.length,
   };

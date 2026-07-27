@@ -50,7 +50,9 @@ pub fn resample_bandlimited(input: &[f32], source_rate: f32, target_rate: f32) -
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpectralFeatures {
     pub centroid_hz: f32,
+    pub bandwidth_hz: f32,
     pub rolloff_85_hz: f32,
+    pub rolloff_95_hz: f32,
     pub flatness: f32,
 }
 
@@ -148,16 +150,24 @@ pub fn spectral_features(
         .map(|(bin, power)| bin as f32 * hz_per_bin * power)
         .sum::<f32>()
         / total;
-    let threshold = total * 0.85;
-    let mut cumulative = 0.0;
-    let rolloff_85_hz = powers
+    let bandwidth_hz = (powers
         .iter()
-        .position(|power| {
-            cumulative += power;
-            cumulative >= threshold
-        })
-        .unwrap_or(0) as f32
-        * hz_per_bin;
+        .enumerate()
+        .map(|(bin, power)| ((bin as f32 * hz_per_bin - centroid_hz).powi(2)) * power)
+        .sum::<f32>()
+        / total)
+        .sqrt();
+    let rolloff = |fraction: f32| {
+        let mut cumulative = 0.0;
+        powers
+            .iter()
+            .position(|power| {
+                cumulative += power;
+                cumulative >= total * fraction
+            })
+            .unwrap_or(0) as f32
+            * hz_per_bin
+    };
     let geometric_mean = powers
         .iter()
         .map(|power| power.max(1e-12).ln())
@@ -166,7 +176,9 @@ pub fn spectral_features(
     let arithmetic_mean = total / powers.len() as f32;
     Some(SpectralFeatures {
         centroid_hz,
-        rolloff_85_hz,
+        bandwidth_hz,
+        rolloff_85_hz: rolloff(0.85),
+        rolloff_95_hz: rolloff(0.95),
         flatness: geometric_mean.exp() / arithmetic_mean,
     })
 }
@@ -180,6 +192,34 @@ pub fn estimate_f0_hz(frame: &[f32], sample_rate: f32) -> f32 {
 pub fn spectral_centroid_hz(frame: &[f32], sample_rate: f32) -> f32 {
     spectral_features(frame, sample_rate, 1024)
         .map(|features| features.centroid_hz)
+        .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_bandwidth_hz(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.bandwidth_hz)
+        .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_rolloff_85_hz(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.rolloff_85_hz)
+        .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_rolloff_95_hz(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.rolloff_95_hz)
+        .unwrap_or(f32::NAN)
+}
+
+#[wasm_bindgen]
+pub fn spectral_flatness(frame: &[f32], sample_rate: f32) -> f32 {
+    spectral_features(frame, sample_rate, 1024)
+        .map(|features| features.flatness)
         .unwrap_or(f32::NAN)
 }
 
@@ -231,6 +271,38 @@ mod tests {
             (spectrum.centroid_hz - 1_000.0).abs() < 60.0,
             "unexpected centroid: {}",
             spectrum.centroid_hz
+        );
+        assert!(
+            spectrum.bandwidth_hz < 180.0,
+            "tone should stay narrow: {}",
+            spectrum.bandwidth_hz
+        );
+        assert!(
+            spectrum.flatness < 0.02,
+            "tone should not resemble noise: {}",
+            spectrum.flatness
+        );
+    }
+
+    #[test]
+    fn separates_broadband_noise_from_a_tonal_spectrum() {
+        let noise = (0..1024)
+            .scan(0x1234_5678_u32, |state, _| {
+                *state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                Some((*state as f32 / u32::MAX as f32) * 2.0 - 1.0)
+            })
+            .collect::<Vec<_>>();
+        let spectrum = spectral_features(&noise, 24_000.0, 1024).expect("noise has spectrum");
+        assert!(
+            spectrum.flatness > 0.3,
+            "noise should be comparatively flat: {}",
+            spectrum.flatness
+        );
+        assert!(spectrum.rolloff_95_hz > spectrum.rolloff_85_hz);
+        assert!(
+            spectrum.bandwidth_hz > 2_000.0,
+            "noise should be broadband: {}",
+            spectrum.bandwidth_hz
         );
     }
 
