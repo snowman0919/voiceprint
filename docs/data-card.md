@@ -10,7 +10,7 @@
 
 ### Download audit: 2026-07-28
 
-The declared Kaggle archive was downloaded locally with `make data-kaggle`; it is ignored by Git and is not in the Docker image. The public download command reported `Apache-2.0`, but the archive contains no `dataset-metadata.json` and the authenticated Kaggle metadata endpoint was unavailable in this environment. Therefore the exact license text, provenance, and redistribution/model-use terms are not yet recorded as verifiable local evidence.
+The declared Kaggle archive was downloaded locally with `make data-kaggle`; it is ignored by Git and is not in the Docker image. The [public Kaggle listing](https://www.kaggle.com/datasets/murtadhanajim/gender-recognition-by-voiceoriginal) and download command report `Apache-2.0` (accessed 2026-07-28). The listing also says the source was obtained online through a reference link; the archive contains no `dataset-metadata.json` and the authenticated Kaggle metadata endpoint was unavailable in this environment. Therefore the upstream source license, provenance, and redistribution/model-use terms are not yet independently recorded as verifiable evidence.
 
 `make data-audit` found 16,148 mono 16 kHz WAV files and no unreadable WAV files. It found 1,078 exact-content duplicate groups containing 2,156 files. The directory labels are `male` and `female`; they are not perceived voice-impression labels. No trusted speaker manifest was found.
 
