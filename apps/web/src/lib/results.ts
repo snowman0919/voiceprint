@@ -23,6 +23,7 @@ export type LocalAnalysis = {
   input: { sampleRate: number; durationSeconds: number; effectiveVoiceSeconds: number };
   quality: AudioQuality & { score: number };
   acousticFeatures: DspSummary;
+  voiceImpression: VoiceImpressionSpectrum;
   acousticSummary: AcousticTendency[];
   modelOutputs: null | {
     kind: "tis-trustworthy-intent";
@@ -41,6 +42,8 @@ export type AcousticTendency = {
   category: "낮음" | "다소 낮음" | "중간" | "다소 높음" | "높음";
 };
 
+export type VoiceImpressionSpectrum = { masculinity: number; femininity: number };
+
 function boundedScore(value: number) {
   return Math.round(Math.max(0, Math.min(100, value)));
 }
@@ -53,13 +56,25 @@ function category(score: number): AcousticTendency["category"] {
   return "높음";
 }
 
+/**
+ * Entertainment-only social voice-expression scale from observed F0 and spectral
+ * balance. It is deliberately not a sex, gender identity, or personality model.
+ */
+export function voiceImpressionSpectrum(dsp: DspSummary): VoiceImpressionSpectrum {
+  const lowPitch = boundedScore((300 - (dsp.f0MedianHz ?? 187.5)) / 2.25);
+  const lowResonance = boundedScore((2_800 - (dsp.spectralCentroidHz ?? 1_650)) / 23);
+  const masculinity = boundedScore(lowPitch * 0.8 + lowResonance * 0.2);
+  return { masculinity, femininity: 100 - masculinity };
+}
+
 /** Measured, deterministic scales; these are not model probabilities or traits. */
 export function acousticTendencies(quality: AudioQuality, dsp: DspSummary): AcousticTendency[] {
+  const spectrum = voiceImpressionSpectrum(dsp);
   const values = [
+    ["남성성", spectrum.masculinity],
+    ["여성성", spectrum.femininity],
+    ["밝은 음색", ((dsp.spectralCentroidHz ?? 0) - 500) / 30],
     ["음높이 안정성", dsp.f0Stability ?? 0],
-    ["상대 고주파 성분", ((dsp.spectralCentroidHz ?? 0) - 500) / 30],
-    ["유성음 연속성", quality.voicedRatio * 100],
-    ["입력 품질", Math.max(0, 100 - quality.clippingRatio * 1_000 - quality.silenceRatio * 25)],
   ] as const;
   return values.map(([label, rawScore]) => {
     const score = boundedScore(rawScore);
@@ -110,6 +125,7 @@ export function createLocalAnalysis(
       score,
     },
     acousticFeatures: dsp,
+    voiceImpression: voiceImpressionSpectrum(dsp),
     acousticSummary: acousticTendencies(quality, dsp),
     modelOutputs: null,
     practiceGoal,
@@ -128,6 +144,8 @@ export function scalarCsv(result: LocalAnalysis) {
     pauseRatio: result.quality.pauseRatio,
     volumeVariation: result.quality.volumeVariation,
     zeroCrossingRateHz: result.quality.zeroCrossingRateHz,
+    masculinityImpression: result.voiceImpression.masculinity,
+    femininityImpression: result.voiceImpression.femininity,
     f0MedianHz: result.acousticFeatures.f0MedianHz ?? "",
     f0MeanHz: result.acousticFeatures.f0MeanHz ?? "",
     f0StdDevHz: result.acousticFeatures.f0StdDevHz ?? "",

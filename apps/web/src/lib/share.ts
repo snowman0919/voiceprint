@@ -4,7 +4,7 @@ export type SharedResultV1 = {
   modelVersion: string;
   dspVersion: string;
   createdAt?: string;
-  summary?: { impression: number; brightness: number; softness: number; stability: number };
+  summary?: { masculinity: number; femininity: number; brightness: number; stability: number };
   acoustic: {
     f0Median?: number;
     f0P05?: number;
@@ -88,7 +88,7 @@ function validate(value: unknown): value is SharedResultV1 {
   return (
     [value.acoustic.voicedRatio, value.quality.score, value.quality.clippingRatio].every(validNumber) &&
     (value.summary === undefined ||
-      [value.summary.impression, value.summary.brightness, value.summary.softness, value.summary.stability].every(
+      [value.summary.masculinity, value.summary.femininity, value.summary.brightness, value.summary.stability].every(
         validNumber,
       ))
   );

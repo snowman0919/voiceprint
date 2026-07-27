@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acousticTendencies, createLocalAnalysis, scalarCsv } from "../results";
+import { acousticTendencies, createLocalAnalysis, scalarCsv, voiceImpressionSpectrum } from "../results";
 
 describe("local result export", () => {
   it("exports scalar values without raw audio and recommends a fix for clipping", () => {
@@ -58,7 +58,7 @@ describe("local result export", () => {
     );
   });
 
-  it("keeps top-line tendency scales tied to measured values, not a model label", () => {
+  it("keeps entertainment expression spectrum tied to measured pitch and spectral balance", () => {
     const tendencies = acousticTendencies(
       {
         durationSeconds: 20,
@@ -74,14 +74,17 @@ describe("local result export", () => {
         droppedFrames: false,
         issues: [],
       },
-      { f0Stability: 80, spectralCentroidHz: 2_000, frames: 10 },
+      { f0MedianHz: 120, f0Stability: 80, spectralCentroidHz: 2_000, frames: 10 },
     );
 
     expect(tendencies).toEqual([
+      { label: "남성성", score: 71, category: "다소 높음" },
+      { label: "여성성", score: 29, category: "다소 낮음" },
+      { label: "밝은 음색", score: 50, category: "중간" },
       { label: "음높이 안정성", score: 80, category: "높음" },
-      { label: "상대 고주파 성분", score: 50, category: "중간" },
-      { label: "유성음 연속성", score: 90, category: "높음" },
-      { label: "입력 품질", score: 100, category: "높음" },
     ]);
+    expect(
+      voiceImpressionSpectrum({ f0MedianHz: 100, spectralCentroidHz: 1_000, frames: 1 }).masculinity,
+    ).toBeGreaterThan(voiceImpressionSpectrum({ f0MedianHz: 260, spectralCentroidHz: 2_500, frames: 1 }).masculinity);
   });
 });

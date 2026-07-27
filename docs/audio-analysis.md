@@ -6,6 +6,8 @@ Current measurements are deliberate, confidence-gated measurements: duration, RM
 
 The result header shows four deterministic recording-level scales: pitch stability, relative high-frequency content, voiced continuity, and input quality. They are calculated from the displayed measurements and labeled as relative indicators, never as probability, personal trait, or model output.
 
+The current header additionally presents a complementary entertainment-only masculinity/femininity expression spectrum computed from median F0 and spectral balance. It is presented with a fixed non-diagnostic, non-identity disclaimer and is separate from every learned model output.
+
 The Rust DSP now has a conservative Burg-LPC candidate estimator: it evaluates seven ceilings from 4.5–8 kHz and emits a path only when it finds an ordered F1–F3 candidate. A regression test uses known synthetic resonances and rejects silence. `ml/voiceprint_ml/validate_formants.py` invokes the Rust WAV-frame CLI and Praat/Parselmouth on the same frame. A sampled TIS frame matched F1 closely but exceeded the 600 Hz gate on F2/F3, so this is not yet displayed as phonetic evidence. Multi-frame continuity, bandwidth/jump scoring, and a passing multi-file reference comparison remain required before browser presentation.
 
 The application does not currently claim CPP, jitter, shimmer, SNR, or general trained impression scores. Those fields remain absent until their algorithms have an offline reference comparison and meaningful signal-quality gate. This prevents a number-shaped placeholder from being presented as phonetic evidence.

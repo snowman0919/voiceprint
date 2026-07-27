@@ -350,6 +350,12 @@ export function Recorder() {
       modelVersion: analysis.modelVersion,
       dspVersion: analysis.dspVersion,
       createdAt: analysis.createdAt,
+      summary: {
+        masculinity: analysis.voiceImpression.masculinity,
+        femininity: analysis.voiceImpression.femininity,
+        brightness: analysis.acousticSummary.find((tendency) => tendency.label === "밝은 음색")?.score ?? 0,
+        stability: analysis.acousticSummary.find((tendency) => tendency.label === "음높이 안정성")?.score ?? 0,
+      },
       acoustic: {
         f0Median: analysis.acousticFeatures.f0MedianHz,
         f0P05: analysis.acousticFeatures.f0P05Hz,
@@ -561,12 +567,17 @@ export function Recorder() {
                 <div key={tendency.label}>
                   <strong>{tendency.label}</strong>
                   <span>
-                    {tendency.score}/100 · {tendency.category}
+                    {tendency.score}% · {tendency.category}
                   </span>
                   <meter aria-label={`${tendency.label} ${tendency.score}`} max="100" min="0" value={tendency.score} />
                 </div>
               ))}
             </div>
+            <p className="safety">
+              음성 특징 기반의 오락용 인상 지표입니다. 성별·성 정체성·성격을 판정하지 않으며, 녹음 조건과 발화 상황에
+              따라 달라질 수 있습니다. ‘남성성’과 ‘여성성’은 우열이나 고정된 기준이 아닌 연속적인 표현 경향을 설명하기
+              위한 친숙한 표현입니다.
+            </p>
           </section>
           {analysis.modelOutputs?.kind === "tis-trustworthy-intent" && (
             <section aria-label="TIS 모델 결과" className="model-result">

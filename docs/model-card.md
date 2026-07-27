@@ -14,6 +14,8 @@ For context, `make evaluate-tis` ran speaker-disjoint handcrafted baselines on t
 
 TIS v1's only output is a score for the dataset's **speaker-produced trustworthy-intent recording condition**, averaged over up to three four-second local windows. It is not a probability, listener rating, truthfulness detector, personality assessment, or a claim about the person speaking. It is trained on short English research recordings and should not be generalized beyond that setting.
 
+The report's entertainment-only masculinity/femininity expression spectrum is deterministic from displayed F0 and spectral-balance measurements. It is not a learned output, does not use TIS, and is not evidence of biological sex, gender identity, personality, ability, truthfulness, or attractiveness. A model-based report in that domain requires purpose-specific, consented, multi-rater perception labels and held-out-speaker validation; it is not currently deployed.
+
 Brightness, softness, stability, identity, sex, age, medical status, personality, and actual intent are not TIS model outputs. The general pipeline rejects biological-sex, identity, age, and speaker-name label columns before training. A Kaggle scalar-feature dataset cannot be repurposed as a waveform model or a user-facing identity/gender inference model.
 
 ## Browser execution
