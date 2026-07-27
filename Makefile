@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit data-tis-audit split split-tis train train-tis export-onnx export-tis-onnx model-manifest validate-onnx validate-tis-onnx sync-model sync-tis-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -37,7 +37,7 @@ test-e2e:
 test: test-wasm test-python test-web test-e2e
 
 test-python:
-	PYTHONPATH=ml python3 -m unittest discover -s ml/tests
+	PYTHONPATH=ml uv run --project ml python -m unittest discover -s ml/tests
 
 data-kaggle:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.download_kaggle --output ml/data/kaggle
@@ -66,13 +66,21 @@ train-tis:
 export-onnx:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.export_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
 
+export-tis-onnx:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.tis_onnx export ml/checkpoints/tis-intent-v1.pt apps/web/public/models/tis-intent-v1.onnx
+
 model-manifest:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.create_manifest apps/web/public/models/voice-impression-v1.onnx --version 1.0.0 --quantization int8-dynamic
 
 validate-onnx:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.validate_onnx ml/checkpoints/voice-impression.pt apps/web/public/models/voice-impression-v1.onnx
 
+validate-tis-onnx:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.tis_onnx validate ml/checkpoints/tis-intent-v1.pt apps/web/public/models/tis-intent-v1.onnx
+
 sync-model: validate-onnx model-manifest
+
+sync-tis-model: export-tis-onnx validate-tis-onnx
 
 benchmark: benchmark-dsp
 
