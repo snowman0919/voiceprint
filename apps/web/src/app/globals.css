@@ -4,6 +4,8 @@ html, body { min-height: 100%; }
 body { min-height: 100svh; display: grid; place-items: center; padding: 32px; color: var(--foreground); background: var(--background); font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
 button { font-size: inherit; }
 .recorder { display: grid; gap: 16px; margin-top: 32px; padding-top: 32px; border-top: 1px solid #d9e0e8; }
+.model-status { display: grid; gap: 4px; padding: 20px 0; border-block: 1px solid #d9e0e8; }
+.model-status p { color: #52606d; font-size: 14px; line-height: 1.5; }
 .recorder h2 { font-size: 28px; letter-spacing: -.04em; }
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #52606d; }
 .prompt, .metadata { color: #52606d; line-height: 1.55; }

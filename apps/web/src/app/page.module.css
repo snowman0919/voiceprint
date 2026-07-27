@@ -2,9 +2,6 @@
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #52606d; }
 .main h1 { font-size: clamp(48px, 10vw, 72px); letter-spacing: -.06em; line-height: .95; }
 .description { max-width: 420px; font-size: 18px; line-height: 1.6; color: #364152; }
-.status { display: flex; align-items: flex-start; gap: 12px; border-block: 1px solid #d9e0e8; padding: 20px 0; }
-.status p, .note { margin-top: 4px; color: #52606d; font-size: 14px; line-height: 1.5; }
-.dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: #f4a340; }
 .main button { width: fit-content; border: 0; border-radius: 4px; padding: 14px 18px; background: #14213d; color: white; font: inherit; font-weight: 700; cursor: pointer; }
 .main button:hover { background: #263a63; }
 .main button:focus-visible { outline: 3px solid #73a5ff; outline-offset: 3px; }
