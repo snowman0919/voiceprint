@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-audit split train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-audit split train export-onnx model-manifest validate-onnx sync-model docker-build docker-run verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -41,6 +41,9 @@ test-python:
 
 data-kaggle:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.download_kaggle --output ml/data/kaggle
+
+data-tis:
+	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.download_tis --output ml/data/tis
 
 data-audit:
 	PYTHONPATH=ml uv run --project ml python -m voiceprint_ml.data_audit ml/data/kaggle --output ml/data/audit.json

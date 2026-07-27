@@ -28,6 +28,7 @@ class DatasetAudit:
     wav_duration_seconds: dict[str, float]
     unreadable_audio: list[str]
     label_balance: dict[str, int]
+    speaker_count: int
     trainable_waveform: bool
     blockers: list[str]
 
@@ -59,6 +60,21 @@ def _wav_metadata(path: Path) -> tuple[int, int, float]:
 def _label_balance(path: Path | None) -> dict[str, int]:
     if not path:
         return {}
+
+
+def _speaker_count(files: list[Path]) -> int:
+    for path in files:
+        if path.suffix.lower() not in {".csv", ".tsv"}:
+            continue
+        try:
+            with path.open(encoding="utf-8", newline="") as source:
+                rows = csv.DictReader(source)
+                if not rows.fieldnames or "speaker_id" not in rows.fieldnames:
+                    continue
+                return len({row["speaker_id"] for row in rows if row.get("speaker_id")})
+        except (OSError, UnicodeDecodeError, csv.Error):
+            continue
+    return 0
     try:
         with path.open(encoding="utf-8", newline="") as source:
             rows = csv.DictReader(source)
@@ -84,9 +100,12 @@ def audit_dataset(root: Path) -> DatasetAudit:
         with csv_file.open(encoding="utf-8", newline="") as source:
             columns = next(csv.reader(source), [])
     license_name = _metadata_license(root)
+    speaker_count = _speaker_count(tabular_files)
     blockers: list[str] = []
     if not license_name:
         blockers.append("Dataset license is missing or unreadable; training is blocked.")
+    if speaker_count < 3:
+        blockers.append("At least three documented speaker IDs are required for speaker-disjoint training.")
     if audio_files:
         kind = "raw_audio"
     elif tabular_files:
@@ -133,7 +152,8 @@ def audit_dataset(root: Path) -> DatasetAudit:
         wav_duration_seconds=durations,
         unreadable_audio=unreadable,
         label_balance=_label_balance(csv_file),
-        trainable_waveform=kind == "raw_audio" and bool(license_name) and not duplicates and not unreadable,
+        speaker_count=speaker_count,
+        trainable_waveform=kind == "raw_audio" and bool(license_name) and speaker_count >= 3 and not duplicates and not unreadable,
         blockers=blockers,
     )
 
@@ -156,6 +176,7 @@ def audit_summary(audit: DatasetAudit) -> dict[str, object]:
         "unreadable_audio_files": len(audit.unreadable_audio),
         "wav_sample_rates": audit.wav_sample_rates,
         "wav_channels": audit.wav_channels,
+        "speaker_count": audit.speaker_count,
         "label_balance": audit.label_balance,
         "trainable_waveform": audit.trainable_waveform,
         "blockers": audit.blockers,

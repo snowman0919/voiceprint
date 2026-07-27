@@ -50,6 +50,19 @@ class DatasetAuditTest(unittest.TestCase):
             self.assertEqual(summary["duplicate_groups"], 1)
             self.assertNotIn("file_sha256", summary)
 
+    def test_raw_audio_without_speaker_ids_cannot_be_marked_trainable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dataset-metadata.json").write_text(json.dumps({"licenseName": "CC-BY-4.0"}))
+            with wave.open(str(root / "only.wav"), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(16_000)
+                output.writeframes(b"\0\0" * 16_000)
+            audit = audit_dataset(root)
+            self.assertFalse(audit.trainable_waveform)
+            self.assertIn("speaker IDs", " ".join(audit.blockers))
+
 
 if __name__ == "__main__":
     unittest.main()
