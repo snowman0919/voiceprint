@@ -6,17 +6,17 @@
 
 `apps/web/public/model-manifest.json`에 활성 모델 1개가 등록되어 있다.
 
-| 필드 | 값 |
-|---|---|
-| `activeModel` | `voice-4dim-vctk-101-v1` |
-| 출력 차원 | impression · brightness · softness · stability |
-| 학습 데이터 | VCTK 0.92 (CC BY 4.0) + VCTK-RVA 다중 청취자 평점 |
-| 화자 수 | 101 (전체 다중 평자, 동의 corpus) |
-| held-out 화자 | 20 (val 10 · test 10, 화자 분리 분할) |
-| ONNX 패리티 | max abs err `2.28e-28` |
-| calibration ECE | `0.0897` (test split, 10-bin) |
-| `reportEligible` | `true` |
-| 검증 SHA-256 | 활성 ONNX + report-evidence JSON 연쇄 |
+| 필드             | 값                                                |
+| ---------------- | ------------------------------------------------- |
+| `activeModel`    | `voice-4dim-vctk-101-v1`                          |
+| 출력 차원        | impression · brightness · softness · stability    |
+| 학습 데이터      | VCTK 0.92 (CC BY 4.0) + VCTK-RVA 다중 청취자 평점 |
+| 화자 수          | 101 (전체 다중 평자, 동의 corpus)                 |
+| held-out 화자    | 20 (val 10 · test 10, 화자 분리 분할)             |
+| ONNX 패리티      | max abs err `2.28e-28`                            |
+| calibration ECE  | `0.0897` (test split, 10-bin)                     |
+| `reportEligible` | `true`                                            |
+| 검증 SHA-256     | 활성 ONNX + report-evidence JSON 연쇄             |
 
 `stability` 출력은 `0.5` 상수 자리 표시자. 추론 결과로 해석하지 않는다. model card는 `ml/checkpoints/report-evidence-101.json`의 `modelCard` 필드에 명시.
 
@@ -57,12 +57,12 @@ make verify   # lint → typecheck → test → validate-model-manifest → dock
 
 `make verify` 전체가 통과해야 배포 자격이 있다. 현재 이 환경에서는 `uv run`/ESLint flat-config 로딩/test-python 네트워크 stall의 환경 항으로 일부가 멈추는 경우가 있다. `docs/deployment.md`의 “환경 항 회피” 절 참고. 각 게이트 단독 실행(`cargo test -p voice-dsp`, `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` 등)은 통과한다.
 
-| 게이트 | 단독 명령 | 의미 |
-|---|---|---|
-| WASM DSP | `make test-wasm` | Rust 단위+속성 테스트 |
-| ML manifest | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` | 활성 모델 report 자격 검증 |
-| ONNX 패리티 | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.validate_onnx` | PyTorch ↔ ONNX 수치 일치 |
-| E2E 프라이버시 | `make test-e2e` | POST/외부 요청 0건, 분석 렌더 |
+| 게이트         | 단독 명령                                                            | 의미                          |
+| -------------- | -------------------------------------------------------------------- | ----------------------------- |
+| WASM DSP       | `make test-wasm`                                                     | Rust 단위+속성 테스트         |
+| ML manifest    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` | 활성 모델 report 자격 검증    |
+| ONNX 패리티    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.validate_onnx`   | PyTorch ↔ ONNX 수치 일치      |
+| E2E 프라이버시 | `make test-e2e`                                                      | POST/외부 요청 0건, 분석 렌더 |
 
 ## 구조
 

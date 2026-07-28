@@ -30,12 +30,14 @@ make build
 ```
 
 `build-wasm` 단계(`scripts/build-wasm.sh`):
+
 1. `wasm-pack build crates/voice-dsp --target web --release`
 2. `pkg/` 출력물을 `apps/web/public/wasm/`으로 복사
 3. JS 글루를 `apps/web/src/generated/voice_dsp.js`로 복사
 4. `import.meta.url` → `self.location.origin` URL 패치(`perl -0pi`)
 
 Next 빌드:
+
 - `next.config.ts`가 `output: "export"`, `trailingSlash: true`, `images.unoptimized`, `typescript.ignoreBuildErrors: true`
 - 산출: `apps/web/out/` 아래 정적 HTML + `_next/` 정적 청크
 - 확인된 라우트 9개: `/`, `/_not-found`, `/about`, `/analyze`, `/privacy`, `/result`, `/settings`
@@ -52,11 +54,11 @@ cat apps/web/out/model-manifest.json | jq .activeModel   # "voice-4dim-vctk-101-
 
 멀티스테이지 Dockerfile:
 
-| Stage | Base | 역할 |
-|---|---|---|
-| `wasm-build` | `rust:1.96-bookworm` | `wasm-pack build crates/voice-dsp` → `public/wasm`, `src/generated` |
-| `web-build` | `node:26-bookworm-slim` | `pnpm install --frozen-lockfile` + `pnpm build` → `out/` |
-| `runtime` | `nginx:1.29-alpine` | `out/` → `/usr/share/nginx/html`, 8080 노출 |
+| Stage        | Base                    | 역할                                                                |
+| ------------ | ----------------------- | ------------------------------------------------------------------- |
+| `wasm-build` | `rust:1.96-bookworm`    | `wasm-pack build crates/voice-dsp` → `public/wasm`, `src/generated` |
+| `web-build`  | `node:26-bookworm-slim` | `pnpm install --frozen-lockfile` + `pnpm build` → `out/`            |
+| `runtime`    | `nginx:1.29-alpine`     | `out/` → `/usr/share/nginx/html`, 8080 노출                         |
 
 ```sh
 make docker-build   # docker build --tag voiceprint:local .
@@ -65,12 +67,14 @@ make docker-run     # docker run --rm -p 8080:8080 voiceprint:local
 ```
 
 런타임 이미지 구성:
+
 - nginx + 정적 자산
 - 없는 것: Node.js, Python, Rust 컴파일러, 학습 데이터, Kaggle credential, PyTorch 체크포인트, ONNX 학습 산출물 중 활성 ONNX 외 전부
 
 ### 4. nginx 구성(`Dockerfile` 내`nginx.conf`)
 
 보안 헤더 강제:
+
 - `Content-Security-Policy`: 동일 origin 자원만, 모델 같은 origin, 인라인 스크립트 SHA 화이트리스트
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp` — `SharedArrayBuffer`(WASM 스레드) 활성화 요구
@@ -134,6 +138,7 @@ make docker-run     # docker run --rm -p 8080:8080 voiceprint:local
 ## 정적 호스팅 일반 안내
 
 nginx 외 임의 정적 호스트(Vercel static, GitHub Pages, Cloudflare Pages, Netlify)에서도 `apps/web/out/`을 서빙하면 동작한다. 요구 사항:
+
 - COOP/COEP 헤더를 설정 가능(Cross-Origin-Embedder-Policy `require-corp`). `SharedArrayBuffer` 의존.
 - 모든 응답에 보안 헤더 주입 가능(CSP·Permissions-Policy·X-Content-Type-Options·Referrer-Policy).
 - `/service-worker.js`는 `Cache-Control: no-cache`.
