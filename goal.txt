@@ -1,0 +1,1888 @@
+Codex Goal: On-device Voice Impression Analyzer
+
+새로운 저장소에서 프로덕션 수준의 온디바이스 음성 인상 분석 웹 애플리케이션을 설계하고 구현하라.
+
+이 프로젝트는 기존 음성 인상 판정 사이트의 간결한 사용자 경험을 참고하되, 서버로 음성을 업로드하지 않고 브라우저 안에서 FFT 기반 음향 분석, 음성학적 특징 추출, ONNX 모델 추론을 모두 수행해야 한다.
+
+최종 산출물은 다음을 포함해야 한다.
+
+1. Next.js + React 기반 정적 웹 애플리케이션
+2. Rust/WebAssembly 기반 로컬 DSP 엔진
+3. PyTorch 기반 학습 파이프라인
+4. mac metal 혹은 RTX 3080 10GB에서 재현 가능한 학습 설정
+5. ONNX Runtime Web 기반 브라우저 추론
+6. 링크만으로 결과를 공유할 수 있는 정적 공유 구조
+7. 분석 결과 JSON, CSV, PNG 다운로드
+8. 온디바이스 처리에 맞춘 개인정보처리방침
+9. Docker 멀티스테이지 프로덕션 이미지
+10. 테스트, 벤치마크, 문서, 데이터 라이선스 기록
+
+중간 단계의 데모 코드에 머물지 말고, 실제로 빌드·테스트·배포할 수 있는 상태까지 완성하라.
+
+⸻
+
+1. 제품 정의
+
+가칭 제품명은 Voiceprint로 한다. 이름과 브랜드 문자열은 한 곳에서 변경할 수 있도록 구성한다.
+
+사용자는 다음 흐름으로 서비스를 이용한다.
+
+1. 사이트 접속
+2. 앱 셸 로드
+3. 기기 호환성 검사
+4. 모델과 WASM 분석 엔진 다운로드
+5. 모델 무결성 검사
+6. 브라우저 캐시에 저장
+7. 마이크 권한 허용
+8. 음성 녹음 또는 로컬 음성 파일 선택
+9. 브라우저 내부 분석
+10. 요약 결과 확인
+11. 상세 음성학 분석 확인
+12. 결과 다운로드 또는 링크 공유
+
+회원가입, 로그인, 사용자 계정, 데이터베이스, 음성 업로드 API는 만들지 않는다.
+
+사이트는 사실상 정적 애플리케이션이어야 한다.
+
+⸻
+
+2. 핵심 원칙
+
+2.1 완전한 온디바이스 분석
+
+다음 데이터는 서버에 전송해서는 안 된다.
+
+* 마이크 원본 오디오
+* 업로드한 음성 파일
+* PCM 데이터
+* 스펙트로그램
+* 음성 임베딩
+* F0 궤적
+* 포먼트 궤적
+* 분석 결과
+* 공유 결과 내용
+
+분석은 다음 환경 안에서만 이루어져야 한다.
+
+* AudioWorklet
+* Web Worker
+* WebAssembly
+* ONNX Runtime Web
+* 브라우저 메모리
+* 사용자가 명시적으로 저장한 IndexedDB 또는 Cache Storage
+
+네트워크 요청을 검사하는 통합 테스트를 작성하여 녹음 시작 이후 원본 음성이나 분석 특징이 외부로 전송되지 않는 것을 검증하라.
+
+2.2 설명 가능한 결과
+
+AI 모델 출력만 보여주지 않는다.
+
+최종 결과는 다음 세 계층으로 분리한다.
+
+1. 관측된 음향 특징
+2. 음성학적 해석
+3. 학습 모델이 추정한 인상 경향
+
+사용자가 확인할 수 없는 내부적인 “AI 설명문”을 생성하지 않는다.
+
+설명은 사전에 정의한 규칙과 측정된 수치를 이용해 결정론적으로 생성한다.
+
+2.3 의료적 판단 금지
+
+다음 기능은 구현하지 않는다.
+
+* 성대 질환 진단
+* 정신 상태 진단
+* 생물학적 성별 확정
+* 실제 연령 확정
+* 성 정체성 추정
+* 개인 식별
+* 거짓말 탐지
+* 감정이나 성격의 확정적 판단
+
+결과는 반드시 “녹음된 목소리가 주는 음향적 인상”으로 표현한다.
+
+2.4 오락용 성별 인상 스펙트럼
+
+결과 요약에는 사용자가 직관적으로 이해할 수 있도록 다음 형식의 오락용 지표를 표시한다.
+
+* 남성성 72% · 여성성 28%
+
+이 수치는 음높이, 공명, 억양, 발화 에너지 등 측정 가능한 음향 특징으로부터 산출한 사회적 음성 인상 스펙트럼이다. 개인의 생물학적 성별, 성 정체성, 성격, 능력, 진실성 또는 매력을 판정하거나 증명하는 값으로 사용하지 않는다.
+
+해당 수치 바로 아래에 다음 안내를 항상 표시한다.
+
+> 음성 특징 기반의 오락용 인상 지표입니다. 성별·성 정체성·성격을 판정하지 않으며, 녹음 조건과 발화 상황에 따라 달라질 수 있습니다. ‘남성성’과 ‘여성성’은 우열이나 고정된 기준이 아닌 연속적인 표현 경향을 설명하기 위한 친숙한 표현입니다.
+
+‘테토/에겐’ 같은 사회적 비유는 세부 음향 요소(저음 안정감, 발화 에너지, 억양 유연성, 부드러운 공명 등)를 먼저 제시한 뒤 보조적인 종합 인상 문구로만 사용한다. 결과 문구는 “이 녹음에서 관찰된 인상”으로 한정하며, 사람 자체의 본질적 특성으로 서술하지 않는다.
+
+2.5 최종 목표: 실사용 보고서 모델
+
+최종 산출물은 보고서 화면에서 실제로 사용하는 음성 인상 모델이어야 한다. 학습 데이터, 라벨 정의, 화자 분리 평가, 보정, ONNX 변환, 브라우저 통합 및 모델 카드가 이 보고서 출력과 직접 연결되어야 한다.
+
+현재의 TIS trustworthy-intent 모델은 학습·배포 파이프라인을 검증하기 위한 한정된 기준선일 뿐이며, 남성성/여성성 음성 인상 스펙트럼 또는 테토/에겐 종합 인상의 근거로 사용하거나 표시하지 않는다. 해당 보고서를 모델 기반으로 제공하려면, 그 목적에 맞는 동의된 다중 평가자 음성 인상 라벨과 별도의 held-out 화자 평가를 갖춘 새 모델을 학습한다. 그 전에는 검증된 음향 측정값과 사전 정의한 결정론적 보고 규칙만 표시한다.
+
+⸻
+
+3. 기술 스택
+
+3.1 웹 애플리케이션
+
+사용 기술:
+
+* Next.js 최신 안정 버전
+* React
+* TypeScript strict mode
+* App Router
+* output: "export"
+* ESLint
+* Prettier
+* Vitest
+* React Testing Library
+* Playwright
+* pnpm
+
+정적 내보내기를 방해하는 기능은 사용하지 않는다.
+
+사용 금지:
+
+* Next.js API Routes
+* Server Actions
+* 동적 SSR
+* 서버 세션
+* 서버 쿠키
+* 서버 데이터베이스
+* 런타임 이미지 최적화 서버
+* 원본 음성 업로드 엔드포인트
+
+next.config.ts는 최소한 다음 방향을 따른다.
+
+const nextConfig = {
+  output: "export",
+  images: {
+    unoptimized: true,
+  },
+  trailingSlash: true,
+};
+
+3.2 로컬 음향 분석
+
+사용 기술:
+
+* Rust
+* wasm-bindgen
+* wasm-pack
+* rustfft 또는 realfft
+* nalgebra
+* Web Worker
+* AudioWorklet
+* Web Audio API
+
+브라우저 메인 UI 스레드에서 긴 FFT, LPC 또는 ONNX 추론을 직접 실행하지 않는다.
+
+3.3 AI 학습
+
+사용 기술:
+
+* Python 3.11 이상
+* PyTorch
+* torchaudio
+* librosa는 데이터 검증 또는 오프라인 비교에만 허용
+* scikit-learn
+* pandas
+* numpy
+* scipy
+* ONNX
+* ONNX Runtime
+* pyarrow
+* matplotlib
+* tensorboard 또는 MLflow
+* Kaggle API
+* Hugging Face Hub API
+
+3.4 브라우저 AI 추론
+
+사용 기술:
+
+* onnxruntime-web
+* WebGPU execution provider
+* WASM execution provider
+* WASM SIMD
+* WASM threads
+* Web Worker
+
+실행 제공자 우선순위:
+
+1. WebGPU
+2. WASM SIMD + threads
+3. WASM SIMD single-thread
+4. 지원 불가 안내
+
+WebGPU 사용이 실패하면 자동으로 WASM으로 전환한다.
+
+폴백은 사용자에게 기술 오류를 그대로 노출하지 말고 다음처럼 간결하게 표시한다.
+
+분석 모드: GPU
+분석 모드: CPU
+
+⸻
+
+4. 저장소 구조
+
+다음과 유사한 모노레포 구조를 사용하라.
+
+voiceprint/
+├── apps/
+│   └── web/
+│       ├── app/
+│       ├── components/
+│       ├── features/
+│       ├── lib/
+│       ├── public/
+│       │   ├── models/
+│       │   ├── wasm/
+│       │   └── model-manifest.json
+│       ├── workers/
+│       ├── worklets/
+│       ├── tests/
+│       ├── next.config.ts
+│       └── package.json
+├── crates/
+│   └── voice-dsp/
+│       ├── src/
+│       ├── tests/
+│       ├── benches/
+│       └── Cargo.toml
+├── ml/
+│   ├── configs/
+│   ├── data/
+│   ├── datasets/
+│   ├── features/
+│   ├── models/
+│   ├── training/
+│   ├── evaluation/
+│   ├── export/
+│   ├── tests/
+│   ├── requirements.lock
+│   └── pyproject.toml
+├── scripts/
+├── docs/
+│   ├── architecture.md
+│   ├── audio-analysis.md
+│   ├── model-card.md
+│   ├── data-card.md
+│   ├── privacy.md
+│   ├── deployment.md
+│   └── validation.md
+├── fixtures/
+│   └── audio/
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── Makefile
+├── pnpm-workspace.yaml
+└── README.md
+
+생성 파일, 학습 데이터, 체크포인트, Kaggle 인증 정보는 Git에 커밋하지 않는다.
+
+⸻
+
+5. 사용자 인터페이스
+
+5.1 디자인 방향
+
+모던한 플랫 디자인으로 제작한다.
+
+시각적 원칙:
+
+* 불필요한 장식 제거
+* 그라디언트 남용 금지
+* 유리 효과 남용 금지
+* 입체적 3D 카드 금지
+* 과도한 그림자 금지
+* 둥근 모서리는 제한적으로 사용
+* 화면당 주요 행동 하나
+* 충분한 여백
+* 강한 제목 대비
+* 일관된 8px spacing system
+* 모바일 우선
+* 데스크톱 반응형
+* WCAG 2.2 AA 수준 접근성
+* 키보드 조작 지원
+* prefers-reduced-motion 지원
+
+아이콘은 필요한 경우에만 사용한다.
+
+사용자에게 기술 설명을 길게 노출하지 않는다.
+
+“AI가 분석합니다”, “첨단 인공지능”, “혁신적인 분석” 같은 홍보성 문구를 사용하지 않는다.
+
+5.2 첫 화면
+
+첫 화면에는 다음만 배치한다.
+
+* 서비스 이름
+* 짧은 설명 한 줄
+* 모델 다운로드 상태
+* 개인정보 핵심 문구
+* 시작 버튼
+
+예시:
+
+Voiceprint
+목소리의 높이, 공명, 음색과 인상 경향을 기기에서 분석합니다.
+음성은 이 기기를 벗어나지 않습니다.
+[분석 모델 받기]
+
+사이트에 접속한 뒤 모델 다운로드를 시작한다.
+
+다만 브라우저 데이터 절약 설정과 사용자의 명시적 선택을 존중하기 위해 다음 정책을 사용한다.
+
+* Wi-Fi 또는 일반 연결에서는 앱 셸 로드 후 자동 다운로드 시작
+* Save-Data: on이면 자동 다운로드하지 않고 버튼 표시
+* 다운로드 크기와 진행률 표시
+* 취소와 재시도 지원
+* 모델이 이미 캐시되어 있으면 재다운로드하지 않음
+* 새 모델 버전이면 사용자에게 업데이트 여부 표시
+* 구버전 모델도 현재 세션에서는 계속 사용할 수 있게 함
+
+표시 예시:
+
+분석 모델 준비 중
+12.4 MB / 18.7 MB
+66%
+
+다운로드 후:
+
+분석 준비 완료
+이 기기에서 처리됩니다.
+
+5.3 녹음 화면
+
+제공 기능:
+
+* 표준 문장 읽기
+* 자유 발화
+* 로컬 파일 선택
+* 녹음 시간
+* 입력 음량
+* 배경 소음 상태
+* clipping 경고
+* 다시 녹음
+* 분석 시작
+
+권장 녹음 길이:
+
+* 최소 유효 음성 8초
+* 권장 15~30초
+* 최대 60초
+
+60초보다 긴 파일은 로컬에서 앞부분만 임의로 자르지 말고, 유효 음성 구간을 선택하거나 사용자에게 범위 선택 UI를 제공한다.
+
+마이크 요청 시 가능한 경우 다음 제약을 요청한다.
+
+{
+  audio: {
+    channelCount: 1,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false
+  }
+}
+
+브라우저가 실제로 적용한 설정은 MediaStreamTrack.getSettings()로 확인해 분석 메타데이터에 포함한다.
+
+5.4 분석 진행 화면
+
+과도한 문장 없이 단계만 표시한다.
+
+입력 확인
+음높이 분석
+공명 분석
+음색 분석
+인상 분석
+결과 정리
+
+진행률은 실제 작업 단계와 연결한다. 가짜로 일정 속도로 증가하는 progress bar를 만들지 않는다.
+
+5.5 결과 헤더
+
+상단에는 긴 설명 대신 핵심 경향만 표시한다.
+
+예시:
+
+중성적 58%
+밝은 음색 71%
+부드러운 발성 64%
+안정적인 높이 82%
+
+헤더에는 최대 4개만 표시한다.
+
+각 지표는 다음을 포함한다.
+
+* 짧은 이름
+* 0~100 경향 점수
+* 수평 비율 바
+* 짧은 범주
+
+예시 범주:
+
+낮음
+다소 낮음
+중간
+다소 높음
+높음
+
+점수를 확률처럼 표현하지 않는다.
+
+잘못된 예:
+
+여성일 확률 82%
+
+올바른 예:
+
+여성적 인상 경향 82
+
+UI상 % 형태를 사용하더라도 가까운 곳에 “확률이 아닌 경향 지표”라고 명시한다.
+
+5.6 상세 결과
+
+요약 아래에서 다음 섹션을 접거나 펼칠 수 있게 한다.
+
+목소리 높이
+
+* F0 중앙값
+* F0 평균
+* 5~95 percentile
+* semitone range
+* F0 안정성
+* F0 contour
+
+공명
+
+* F1 중앙값
+* F2 중앙값
+* F3 중앙값
+* 포먼트 간격
+* 추정 성도 길이
+* 포먼트 추적 성공률
+* F1/F2 vowel-space plot
+
+스펙트럼
+
+* spectrogram
+* 평균 파워 스펙트럼
+* spectral centroid
+* spectral roll-off
+* spectral flatness
+* spectral slope
+* 대역별 에너지 비율
+
+음질
+
+* HNR
+* CPP
+* jitter
+* shimmer
+* 유성음 비율
+* clipping 비율
+* SNR 추정치
+
+말하기 특성
+
+* 발화 속도
+* 휴지 비율
+* 음량 변화
+* 억양 변화
+* 안정성
+
+분석 모델
+
+* 음성학 규칙 결과
+* ONNX 모델 결과
+* 두 분석의 일치도
+* 입력 품질
+* 모델 버전
+* DSP 버전
+* 추론 제공자
+* 추론 시간
+
+상세 숫자는 단위를 반드시 표시한다.
+
+⸻
+
+6. 더 좋은 목소리를 위한 방법론
+
+결과 아래에 목소리 조정 가이드 섹션을 제공한다.
+
+“좋다”를 하나의 절대 기준으로 정의하지 않는다.
+
+사용자가 원하는 목표를 선택하게 한다.
+
+목표 예시:
+
+* 더 또렷하게
+* 더 안정적으로
+* 더 밝게
+* 더 부드럽게
+* 더 낮고 차분하게
+* 더 높고 가볍게
+* 억양을 풍부하게
+* 긴장감을 줄이기
+
+권장사항은 측정 결과와 목표에 따라 규칙 기반으로 생성한다.
+
+생성형 언어 모델은 사용하지 않는다.
+
+6.1 권장 규칙 예시
+
+입력 음량이 지나치게 작을 때
+
+마이크와 15~25cm 거리를 유지하고, 숨을 밀어내기보다 일정한 호흡으로 말해 보세요.
+
+clipping이 높을 때
+
+마이크에서 조금 멀어지거나 입력 음량을 낮춘 뒤 다시 측정하세요.
+
+F0 변동이 지나치게 작고 억양이 단조로울 때
+
+핵심 단어에서만 높이를 조금 올리고, 문장 끝의 높이를 의도적으로 정리해 보세요.
+
+F0 추적이 불안정할 때
+
+목에 힘을 주어 높이를 고정하지 말고, 편안한 음역에서 일정한 호흡으로 문장을 반복하세요.
+
+발화 속도가 지나치게 빠를 때
+
+의미 단위마다 짧게 멈추고, 자음보다 모음의 길이를 급하게 줄이지 않도록 연습하세요.
+
+spectral tilt가 목표보다 가파르고 더 밝은 음색을 원할 때
+
+음을 세게 밀기보다 입 앞쪽에서 울리는 느낌으로 명료한 모음을 유지해 보세요.
+
+기식 성분이 높을 때
+
+숨을 많이 섞어 소리를 키우지 말고, 편안한 크기에서 짧은 모음을 일정하게 이어 보세요.
+
+목소리를 부드럽게 만들고 싶을 때
+
+문장 시작을 강하게 치지 말고, 낮은 음량에서 모음으로 부드럽게 연결하는 연습을 해 보세요.
+
+6.2 안전 조건
+
+다음 문구를 가이드 하단에 표시한다.
+
+이 가이드는 음향적 연습 제안이며 의료 조언이 아닙니다.
+통증, 쉰 목소리 또는 불편감이 지속되면 연습을 중단하고 전문가와 상담하세요.
+
+다음과 같은 조언은 금지한다.
+
+* 통증을 참고 발성하라는 지시
+* 극단적으로 낮거나 높은 음을 강요
+* 성대를 압박하라는 지시
+* 장시간 무휴식 연습
+* 질환을 추정하거나 진단
+* 특정 성별의 목소리가 더 좋다는 표현
+
+⸻
+
+7. 공유 링크 설계
+
+7.1 정적 호스팅 제약
+
+서버 데이터베이스와 동적 결과 API 없이 링크 공유가 가능해야 한다.
+
+분석 결과를 URL fragment에 직렬화한다.
+
+예시:
+
+https://example.com/result/#r=<encoded-payload>
+
+URL fragment는 일반 HTTP 요청 경로에 포함되지 않으므로 결과 데이터가 정적 호스팅 서버에 전달되지 않는 구조를 유지할 수 있다.
+
+쿼리 문자열보다 fragment를 우선한다.
+
+다음 형식을 사용한다.
+
+type SharedResultV1 = {
+  schemaVersion: 1;
+  appVersion: string;
+  modelVersion: string;
+  dspVersion: string;
+  createdAt?: string;
+  summary: {
+    impression: number;
+    brightness: number;
+    softness: number;
+    stability: number;
+  };
+  acoustic: {
+    f0Median: number;
+    f0P05: number;
+    f0P95: number;
+    f1Median?: number;
+    f2Median?: number;
+    f3Median?: number;
+    hnr?: number;
+    cpp?: number;
+    voicedRatio: number;
+  };
+  quality: {
+    score: number;
+    snr?: number;
+    clippingRatio: number;
+  };
+};
+
+공유 payload에는 다음을 절대로 포함하지 않는다.
+
+* 원본 음성
+* PCM
+* 압축 오디오
+* spectrogram matrix
+* 프레임별 F0 전체 배열
+* 프레임별 포먼트 배열
+* 임베딩
+* 개인 식별자
+* 파일명
+* 로컬 경로
+* 마이크 장치 이름
+* 브라우저 fingerprint
+
+7.2 인코딩
+
+다음 파이프라인을 사용한다.
+
+정규화된 JSON
+-> 선택적 정수 양자화
+-> MessagePack 또는 CBOR
+-> Brotli 또는 deflate
+-> base64url
+-> URL fragment
+
+공유 링크 길이는 일반적인 브라우저와 메신저에서 안정적으로 다룰 수 있도록 목표 4KB 이하, 최대 8KB 이하로 제한한다.
+
+길이가 초과되면 세부 데이터를 제거하고 요약 결과만 포함한다.
+
+7.3 공유 결과 화면
+
+공유 링크를 연 사용자는 모델을 다운로드하지 않아도 공유된 요약 결과를 볼 수 있어야 한다.
+
+공유 화면은 URL fragment의 데이터를 클라이언트에서 해석한다.
+
+공유 결과에는 다음 안내를 표시한다.
+
+이 결과는 공유 링크에 포함된 요약 데이터입니다.
+원본 음성은 포함되어 있지 않습니다.
+
+정적 호스팅만으로 동적 Open Graph 이미지를 생성할 수 없으므로, MVP에서는 동적 SNS 미리보기 이미지를 구현하지 않는다.
+
+고정 Open Graph 이미지만 제공한다.
+
+동적 OGP는 추후 선택적인 별도 서비스로 분리하며, 현재 프로젝트의 필수 요건으로 만들지 않는다.
+
+7.4 변조 가능성
+
+순수 정적 구조에서는 서버 비밀키를 안전하게 보관할 수 없으므로 공유 결과의 서버 서명을 제공할 수 없다.
+
+공유 화면에 다음을 명시한다.
+
+공유 결과는 링크 작성자가 수정할 수 있으며 공식 인증 결과가 아닙니다.
+
+체크섬은 전송 오류 검출 용도로만 사용하고 위변조 방지 기능으로 설명하지 않는다.
+
+⸻
+
+8. 다운로드 기능
+
+결과 페이지에서 다음 다운로드를 지원한다.
+
+JSON
+
+전체 분석 결과와 버전 정보를 포함한다.
+
+{
+  "schemaVersion": 1,
+  "createdAt": "ISO-8601",
+  "appVersion": "...",
+  "modelVersion": "...",
+  "dspVersion": "...",
+  "input": {
+    "sampleRate": 48000,
+    "durationSeconds": 20.4,
+    "effectiveVoiceSeconds": 16.8
+  },
+  "quality": {},
+  "summary": {},
+  "acousticFeatures": {},
+  "modelOutputs": {},
+  "recommendations": []
+}
+
+CSV
+
+사람이 분석 도구에서 다시 사용할 수 있도록 scalar feature를 한 행으로 출력한다.
+
+PNG
+
+결과 요약 카드와 핵심 그래프를 로컬에서 렌더링해 저장한다.
+
+* 외부 캡처 API 금지
+* 원본 음성 포함 금지
+* 사용자 이름 자동 삽입 금지
+* 모델 버전과 생성일 표시
+* 2x 해상도 지원
+
+원본 음성 다운로드는 사용자가 직접 녹음 보관을 선택한 경우에만 제공한다. 기본적으로 녹음은 분석 완료 후 메모리에서 폐기한다.
+
+⸻
+
+9. 모델 다운로드와 캐시
+
+9.1 모델 manifest
+
+public/model-manifest.json을 생성한다.
+
+예시:
+
+{
+  "schemaVersion": 1,
+  "activeModel": "voice-impression-v1",
+  "models": [
+    {
+      "id": "voice-impression-v1",
+      "version": "1.0.0",
+      "url": "/models/voice-impression-v1.int8.onnx",
+      "size": 14682340,
+      "sha256": "...",
+      "inputSampleRate": 16000,
+      "inputSeconds": 20,
+      "opset": 18,
+      "quantization": "int8-dynamic",
+      "minimumAppVersion": "1.0.0"
+    }
+  ]
+}
+
+9.2 다운로드 절차
+
+1. manifest 로드
+2. 캐시 확인
+3. 모델 버전 확인
+4. streaming fetch
+5. 진행률 표시
+6. SHA-256 확인
+7. ONNX 세션 생성
+8. warm-up 추론
+9. 준비 완료 표시
+
+무결성 검증 실패 시 캐시를 삭제하고 한 번 재시도한다.
+
+9.3 캐시
+
+* Cache Storage를 우선 사용
+* 필요한 경우 IndexedDB 사용
+* 모델 URL에 콘텐츠 해시 또는 버전 포함
+* 앱 업데이트와 모델 업데이트를 분리
+* 사용자가 설정에서 모델 캐시를 삭제할 수 있게 함
+* 캐시 사용량 표시
+* 스토리지 부족 오류 처리
+
+Service Worker는 정적 앱과 모델 캐싱에만 사용한다.
+
+ONNX 추론을 Service Worker 안에서 실행하지 않는다.
+
+⸻
+
+10. DSP 파이프라인
+
+10.1 입력 형식
+
+원본 녹음:
+
+* 가능하면 48kHz
+* mono
+* Float32 PCM
+* 브라우저 기본 샘플레이트 기록
+
+DSP 분석:
+
+* 24kHz 기본
+* AI 입력용 16kHz 파생
+* 고품질 band-limited resampling
+* 원본 배열을 불필요하게 복제하지 않음
+
+10.2 입력 품질 검사
+
+분석 전에 다음을 계산한다.
+
+* duration
+* effective voiced duration
+* RMS
+* peak
+* clipping ratio
+* DC offset
+* estimated SNR
+* silence ratio
+* voiced ratio
+* dropped frame 여부
+* 실제 적용된 마이크 processing 설정
+
+최소 품질 조건을 충족하지 않으면 결과를 억지로 생성하지 않는다.
+
+판정 실패 사유를 명확히 분리한다.
+
+* 음성이 너무 짧음
+* 배경 소음이 큼
+* 입력이 너무 작음
+* clipping이 큼
+* 유성음이 부족함
+* 지원하지 않는 파일
+* 모델 로드 실패
+* 분석 엔진 오류
+
+10.3 프레임 설정
+
+초기 기본값:
+
+* analysis sample rate: 24,000Hz
+* frame length: 25ms
+* hop length: 10ms
+* FFT size: 1024
+* window: Hann
+* pre-emphasis: 기능 플래그로 제어
+* epsilon floor 적용
+
+상수는 코드 곳곳에 하드코딩하지 말고 하나의 버전 관리되는 분석 설정에 둔다.
+
+10.4 FFT/STFT 특징
+
+다음을 구현한다.
+
+* waveform
+* FFT
+* STFT
+* power spectrum
+* log power spectrum
+* spectrogram
+* spectral centroid
+* spectral bandwidth
+* spectral roll-off 85%, 95%
+* spectral flatness
+* spectral flux
+* spectral slope
+* zero crossing rate
+* 대역별 에너지
+* harmonic energy ratio
+
+모든 특징에 다음 테스트를 작성한다.
+
+* 무음
+* sine wave
+* harmonic series
+* white noise
+* pink noise
+* chirp
+* clipping signal
+* known fixture audio
+
+10.5 F0
+
+초기 구현은 YIN 계열 또는 검증 가능한 자기상관 기반 알고리즘을 사용한다.
+
+가능하다면 다음을 제공한다.
+
+* frame-level F0
+* confidence
+* voiced/unvoiced
+* median
+* mean
+* standard deviation
+* P05
+* P95
+* semitone range
+* contour smoothness
+* octave jump detection
+
+허용 범위는 고정 성별 가정에 의존하지 않게 넓게 설정한다.
+
+예:
+
+50Hz ~ 700Hz
+
+125Hz 이하를 강제로 특정 범주로 판정하는 하드 규칙을 넣지 않는다.
+
+10.6 포먼트
+
+Burg LPC 기반 F1, F2, F3 추정을 구현한다.
+
+단일 formant ceiling만 사용하지 않는다.
+
+여러 후보를 평가한다.
+
+예:
+
+4500
+5000
+5500
+6000
+6500
+7000
+8000 Hz
+
+각 후보에 대해 다음을 평가한다.
+
+* LPC residual
+* 포먼트 누락률
+* 비현실적 대역폭
+* 프레임 간 jump
+* 유효 범위 위반
+* 시간적 연속성
+
+최적 경로를 선택하고 신뢰도를 출력한다.
+
+포먼트 분석은 Praat 또는 Parselmouth 오프라인 기준 결과와 비교하는 검증 스크립트를 제공한다.
+
+브라우저 프로덕션 코드에 Python이나 Praat 런타임을 포함하지 않는다.
+
+10.7 음질
+
+가능한 범위에서 다음을 구현한다.
+
+* HNR
+* CPP
+* local jitter
+* local shimmer
+* H1-H2
+* spectral tilt
+* periodicity
+* breathiness proxy
+* roughness proxy
+
+jitter와 shimmer는 충분한 유성음과 안정적인 주기 검출이 있을 때만 표시한다.
+
+신뢰할 수 없으면 측정 불충분으로 반환한다.
+
+⸻
+
+11. 데이터셋 준비
+
+11.1 기본 Kaggle 데이터셋
+
+기본 입력 데이터셋:
+
+https://www.kaggle.com/datasets/murtadhanajim/gender-recognition-by-voiceoriginal
+
+Kaggle API를 사용해 다운로드할 수 있도록 한다.
+
+예상 환경변수:
+
+KAGGLE_USERNAME
+KAGGLE_KEY
+
+또는 ~/.kaggle/kaggle.json을 지원한다.
+
+스크립트 예시:
+
+make data-kaggle
+
+반드시 다운로드 후 다음을 자동 검사한다.
+
+* dataset metadata
+* license
+* 파일 목록
+* 압축 해제 크기
+* 오디오 파일 형식
+* sample rate
+* channel count
+* duration
+* label 구조
+* speaker ID 존재 여부
+* 중복 파일
+* 손상 파일
+* class imbalance
+* 데이터 출처
+* 재배포 허용 여부
+
+라이선스가 없거나 불명확하면:
+
+1. 학습 실행을 중단한다.
+2. 이유를 출력한다.
+3. 사용자가 명시적으로 승인하지 않는 한 우회하지 않는다.
+4. 저장소나 Docker 이미지에 데이터를 포함하지 않는다.
+
+11.2 데이터 성격 검증
+
+이 데이터셋이 실제 원본 오디오를 포함하는지, 이미 추출된 scalar feature만 포함하는지 코드로 검사한다.
+
+원본 오디오가 있는 경우
+
+* 파형 기반 모델 학습에 사용
+* 직접 DSP 특징 재추출
+* speaker ID를 확보
+* 화자 단위 split
+
+scalar feature만 있는 경우
+
+* raw-audio CNN 학습에 사용하지 않음
+* handcrafted-feature baseline에만 사용
+* 브라우저 DSP와 동일한 특징 정의인지 검증
+* 정의가 다른 특징은 직접 대응시키지 않음
+
+데이터셋 이름만 보고 파일 구조를 추정하지 않는다.
+
+11.3 추가 데이터셋
+
+기본 데이터만으로 다음 목표를 충분히 학습할 수 없으면 Hugging Face 또는 공식 공개 음성 코퍼스를 추가할 수 있다.
+
+추가 데이터셋 조건:
+
+* 명확한 라이선스
+* 상업적 또는 배포 목적과 양립 가능
+* speaker ID 제공
+* 원본 음성 제공
+* 데이터 출처 문서화
+* 학습 사용 허용
+* 모델 배포 제한 확인
+
+후보 검색 범주:
+
+* Common Voice
+* LibriSpeech
+* VCTK
+* VoxCeleb은 라이선스와 재배포 조건을 특히 엄격히 검토
+* Hugging Face의 라이선스가 명시된 speech classification corpus
+
+추가 데이터셋을 자동으로 다운로드하기 전에 docs/data-card.md에 다음을 기록한다.
+
+* 이름
+* URL
+* 버전
+* 라이선스
+* 용도
+* 포함 여부
+* 제외 사유
+* 샘플 수
+* 화자 수
+* 언어
+* 라벨
+* 알려진 편향
+
+11.4 중요한 라벨 한계
+
+제공된 데이터의 male/female 라벨은 실제 화자 라벨일 가능성이 높으며, 사용자가 지각한 “남성적·여성적 인상” 라벨과 동일하지 않다.
+
+따라서 모델과 UI에서 다음을 구분한다.
+
+* 학습 데이터의 speaker sex/gender label
+* 모델이 학습한 acoustic classification
+* 서비스가 표시하는 voice impression tendency
+
+초기 모델은 binary acoustic tendency baseline으로 명시한다.
+
+이를 실제 지각 인상 모델이라고 과장하지 않는다.
+
+지각 인상 점수를 제대로 만들려면 별도의 다중 평가자 데이터가 필요하다는 내용을 모델 카드에 기록한다.
+
+⸻
+
+12. 데이터 전처리
+
+다음 전처리 파이프라인을 구현한다.
+
+1. manifest 생성
+2. 오디오 파일 검증
+3. mono 변환
+4. sample-rate 통일
+5. 과도한 무음 제거
+6. 유효 음성 구간 검출
+7. fixed-length crop 또는 segment
+8. loudness normalization은 실험 플래그로 제공
+9. 특징 추출
+10. 캐시 저장
+11. speaker-disjoint split
+12. 통계 생성
+
+12.1 데이터 누수 방지
+
+동일 화자의 녹음이 train, validation, test에 동시에 들어가면 안 된다.
+
+우선순위:
+
+1. 공식 speaker ID
+2. 파일 메타데이터의 speaker ID
+3. 데이터 소스별 speaker ID
+4. 신뢰할 수 있는 그룹 정보
+
+speaker ID가 없으면 이 한계를 명확히 기록하고, 파일 단위 split 결과를 일반화 성능으로 과장하지 않는다.
+
+오디오 fingerprint를 이용해 정확·근사 중복을 검사한다.
+
+12.2 증강
+
+다음 증강을 제한적으로 사용한다.
+
+* background noise
+* room impulse response
+* gain
+* codec simulation
+* mild speed perturbation
+* mild pitch shift
+* mild formant-aware augmentation
+
+주의:
+
+* pitch shift가 label 자체를 바꿀 수 있으므로 무조건 label-preserving으로 취급하지 않는다.
+* 성별 인상 모델에서 과도한 pitch/formant augmentation을 금지한다.
+* 원본과 증강본은 같은 split에 있어야 한다.
+* 증강 전후 평가를 ablation으로 비교한다.
+
+⸻
+
+13. 모델 설계
+
+Pytorch를 사용하며
+RTX 3080 10GB에서 학습 가능해야 한다.
+혹은 맥북에서.
+
+거대한 foundation model을 기본 모델로 사용하지 않는다.
+
+13.1 베이스라인 A: Handcrafted Feature MLP
+
+입력:
+
+* F0 statistics
+* F1/F2/F3
+* formant spacing
+* estimated vocal tract length
+* MFCC summary
+* spectral features
+* HNR
+* CPP
+* jitter
+* shimmer
+* voiced ratio
+* speech timing features
+
+구조:
+
+input
+-> LayerNorm
+-> Linear
+-> GELU
+-> Dropout
+-> residual MLP blocks
+-> output heads
+
+장점:
+
+* 작음
+* 설명 가능
+* WASM CPU에서도 빠름
+* Kaggle 데이터가 scalar feature만 제공하는 경우 사용 가능
+
+13.2 베이스라인 B: Log-Mel CNN
+
+입력:
+
+* 16kHz mono
+* 10~20초 segment
+* log-Mel spectrogram
+* 64 또는 80 Mel bins
+
+구조:
+
+* 소형 depthwise separable CNN 또는 EfficientNet 계열 소형 구조
+* temporal statistics pooling
+* 1~5M parameter 목표
+* BatchNorm 또는 GroupNorm
+* GELU 또는 SiLU
+* 출력 head
+
+13.3 최종 모델: Hybrid Fusion
+
+두 브랜치를 결합한다.
+
+Log-Mel CNN -> acoustic embedding
+Handcrafted features -> feature embedding
+concatenate
+-> fusion MLP
+-> calibrated outputs
+
+출력:
+
+* acoustic gender-impression tendency
+* brightness
+* softness
+* stability
+* optional age-like tendency only if valid labels exist
+* model confidence
+* out-of-distribution score 또는 uncertainty proxy
+
+라벨이 없는 출력은 임의로 학습하지 않는다.
+
+밝기, 부드러움, 안정감 라벨이 없다면:
+
+* AI 예측 head로 만들지 말고
+* 검증 가능한 음성학 기반 지표로만 제공한다.
+
+가짜 라벨을 자동 생성해 실제 사람의 지각 라벨처럼 학습시키지 않는다.
+
+⸻
+
+14. 학습 설정
+
+RTX 3080 10GB 혹은 맥북 m4 pro를 기준으로 자동 설정한다.
+
+초기 기본값:
+
+device: cuda or mps
+precision: fp16
+batch_size: 16
+gradient_accumulation_steps: 2
+num_workers: 4
+epochs: 100
+optimizer: adamw
+learning_rate: 0.0003
+weight_decay: 0.01
+scheduler: cosine
+warmup_ratio: 0.05
+early_stopping_patience: 8
+gradient_clip_norm: 1.0
+seed: 42
+
+OOM 발생 시 자동 폴백:
+
+1. batch size 절반
+2. gradient accumulation 증가
+3. segment 길이 축소
+4. feature cache 사용
+5. gradient checkpointing은 필요한 경우에만 사용
+
+다음 기능을 제공한다.
+
+* deterministic seed
+* AMP
+* checkpoint resume
+* best checkpoint
+* early stopping
+* TensorBoard 로그
+* confusion matrix
+* ROC-AUC
+* PR-AUC
+* balanced accuracy
+* macro F1
+* calibration error
+* subgroup metrics
+* latency
+* parameter count
+* model size
+
+클래스 불균형이 있으면 단순 accuracy만 보고하지 않는다.
+
+⸻
+
+15. 평가
+
+15.1 필수 비교
+
+다음을 비교한다.
+
+1. majority baseline
+2. logistic regression
+3. SVM
+4. random forest 또는 gradient boosting
+5. handcrafted MLP
+6. log-Mel CNN
+7. hybrid fusion
+
+최종 모델은 정확도만으로 결정하지 않는다.
+
+평가 기준:
+
+* generalization
+* calibration
+* 모델 크기
+* CPU 추론 시간
+* WebGPU 추론 시간
+* 모바일 메모리 사용량
+* 브라우저 operator compatibility
+* 설명 가능성
+
+15.2 Ablation
+
+최소한 다음 ablation을 수행한다.
+
+* F0 only
+* formants only
+* spectral only
+* handcrafted all
+* Mel only
+* Mel + handcrafted
+* augmentation on/off
+* quantized/unquantized
+* 10초/20초 입력
+
+15.3 브라우저 목표 성능
+
+데스크톱 목표:
+
+* 모델 다운로드 25MB 이하
+* WASM 포함 초기 분석 자산 35MB 이하
+* warm inference 2초 이하
+* 전체 20초 음성 분석 5초 이하
+* peak memory 500MB 이하
+
+중급 모바일 목표:
+
+* 모델 다운로드 15MB 이하 권장
+* warm inference 4초 이하
+* 전체 분석 10초 이하
+* peak memory 350MB 이하
+
+성능 목표를 달성하지 못하면 실제 측정값을 문서화하고 병목을 분석한다.
+
+⸻
+
+16. ONNX 내보내기
+
+PyTorch 모델을 ONNX로 내보낸다.
+
+요구사항:
+
+* 고정 또는 제한적 dynamic input
+* WebGPU 지원 operator 확인
+* WASM 지원 확인
+* unsupported operator 제거
+* ONNX checker
+* ONNX Runtime Python 검증
+* PyTorch와 수치 비교
+* browser golden test
+
+내보내기 명령:
+
+make export-onnx
+
+산출물:
+
+model.fp32.onnx
+model.fp16.onnx
+model.int8.onnx
+model-metadata.json
+model-card.md
+
+기본 배포 모델은 실제 브라우저 정확도와 호환성을 비교한 뒤 선택한다.
+
+무조건 INT8을 선택하지 않는다.
+
+WebGPU operator 지원과 정확도 저하를 검증한다.
+
+허용 오차를 테스트에 명시한다.
+
+예:
+
+max absolute error
+mean absolute error
+class probability deviation
+top prediction consistency
+
+⸻
+
+17. 브라우저 추론
+
+모델 입력 전처리가 Python 학습 코드와 브라우저 코드에서 정확히 일치해야 한다.
+
+다음을 하나의 versioned specification으로 관리한다.
+
+* sample rate
+* frame length
+* hop length
+* FFT size
+* Mel bins
+* fmin
+* fmax
+* log epsilon
+* normalization mean
+* normalization std
+* crop policy
+* padding policy
+* handcrafted feature order
+* missing-value handling
+
+Python에서 golden fixture를 생성한다.
+
+브라우저 테스트는 같은 오디오에 대해 다음을 비교한다.
+
+* resampled PCM
+* STFT 일부 bin
+* Mel spectrogram
+* scalar features
+* ONNX input tensor
+* model output
+
+전처리 불일치는 모델 정확도보다 우선적으로 수정한다.
+
+⸻
+
+18. 개인정보처리방침
+
+한국어 개인정보처리방침 페이지를 작성한다.
+
+법률 자문을 받은 것처럼 표현하지 않는다.
+
+실제 구현과 정확히 일치해야 한다.
+
+최소 문구는 다음 취지를 포함하되, 서비스명과 배포 환경에 맞춰 완성하라.
+
+개인정보처리방침 초안
+
+개인정보처리방침
+Voiceprint는 사용자의 음성을 브라우저 내부에서 분석하는 온디바이스 음성 분석 서비스입니다.
+1. 처리되는 정보
+서비스는 사용자가 직접 녹음하거나 선택한 음성 데이터를 분석합니다. 음성 데이터와 분석 과정에서 생성되는 파형, 주파수 정보, 음성학적 특징 및 모델 입력값은 사용자의 기기 안에서 처리됩니다.
+2. 서버 전송 여부
+음성 원본, 음성에서 추출된 특징, 음성 임베딩 및 분석 결과는 서비스 운영 서버로 전송되지 않습니다. 분석은 WebAssembly와 ONNX Runtime Web을 이용하여 사용자의 브라우저에서 수행됩니다.
+3. 저장
+기본 설정에서는 녹음된 음성을 분석 완료 후 브라우저 메모리에서 제거합니다. 사용자가 결과 저장 또는 모델 캐시 기능을 사용하는 경우 분석 결과와 모델 파일이 사용자의 브라우저 저장 공간에 저장될 수 있습니다.
+사용자는 서비스 설정에서 저장된 결과와 모델 캐시를 삭제할 수 있습니다.
+4. 모델 파일과 정적 자산
+서비스 이용을 위해 브라우저는 정적 호스팅 서버 또는 CDN에서 분석 모델, WebAssembly 모듈, JavaScript, CSS 및 이미지 파일을 다운로드합니다. 이 요청 과정에서 웹 서버는 일반적인 접속 정보인 IP 주소, 요청 시각, 사용자 에이전트 및 요청 URL을 처리할 수 있습니다.
+이러한 접속 정보의 보관 여부와 기간은 실제 배포 사업자 또는 호스팅 제공자의 정책에 따라 별도로 명시합니다.
+5. 공유 링크
+사용자가 결과 공유 기능을 선택하면 분석 결과의 일부가 공유 링크의 URL fragment에 포함됩니다. 원본 음성은 공유 링크에 포함되지 않습니다.
+URL fragment는 일반적인 웹 서버 요청에 포함되지 않지만, 사용자가 링크를 다른 사람이나 애플리케이션에 전달하면 링크를 받은 주체가 포함된 결과를 확인할 수 있습니다.
+공유 링크에는 민감한 정보나 개인을 식별할 수 있는 내용을 추가하지 않는 것이 권장됩니다.
+6. 제3자 제공
+서비스는 사용자의 원본 음성 또는 분석 결과를 제3자에게 제공하지 않습니다. 다만 정적 파일 제공을 위해 사용하는 호스팅 또는 CDN 사업자는 일반적인 접속 로그를 처리할 수 있습니다.
+7. 분석 모델
+서비스는 기기에서 실행되는 음성 분석 모델을 사용합니다. 분석 결과는 의학적 진단, 신원 확인, 실제 성별, 성 정체성, 성격 또는 실제 연령을 확정하는 정보가 아닙니다.
+8. 마이크 권한
+마이크는 사용자가 녹음 기능을 시작하고 브라우저 권한을 허용한 경우에만 사용됩니다. 사용자는 브라우저 설정에서 언제든지 마이크 권한을 철회할 수 있습니다.
+9. 이용자의 선택
+사용자는 다음 작업을 직접 수행할 수 있습니다.
+- 녹음 중지
+- 분석 취소
+- 저장 결과 삭제
+- 모델 캐시 삭제
+- 공유 링크 생성 여부 선택
+- 결과 파일 다운로드 여부 선택
+10. 변경 사항
+개인정보처리방침이 변경되는 경우 적용일과 변경 내용을 서비스 화면에 표시합니다.
+시행일: 실제 배포일 입력
+
+18.1 추적 도구
+
+기본 설정에서는 다음을 넣지 않는다.
+
+* Google Analytics
+* Meta Pixel
+* 광고 SDK
+* 세션 리플레이
+* 사용자 fingerprinting
+* 음성 관련 telemetry
+* 외부 오류 추적에 음성 데이터 첨부
+
+익명 사용량 분석이 필요해도 별도의 opt-in 없이는 추가하지 않는다.
+
+CSP와 Permissions Policy를 설정한다.
+
+예시 방향:
+
+Permissions-Policy: microphone=(self)
+
+정적 호스팅 환경에 맞게 CSP를 구성하고, ONNX/WASM 실행에 필요한 범위만 허용한다.
+
+⸻
+
+19. Docker 프로덕션 배포
+
+19.1 목표
+
+Next.js 정적 export 결과를 Nginx 또는 동등한 정적 서버로 제공한다.
+
+멀티스테이지 Dockerfile을 작성한다.
+
+단계:
+
+1. pnpm dependencies
+2. Rust WASM build
+3. Next.js static build
+4. Nginx runtime
+
+최종 이미지에는 다음을 포함하지 않는다.
+
+* Node.js 개발 의존성
+* Python
+* PyTorch
+* 학습 데이터
+* Kaggle API 키
+* 체크포인트
+* Rust compiler
+* 소스맵은 배포 정책에 따라 선택
+
+19.2 라우팅
+
+다음을 지원한다.
+
+/
+/analyze/
+/result/
+/privacy/
+/about/
+/settings/
+
+정적 export의 trailing slash와 Nginx try_files 설정을 맞춘다.
+
+공유 결과는 /result/#r=... 형태로 처리한다.
+
+19.3 압축
+
+다음 정적 자산을 적절히 압축한다.
+
+* JS
+* CSS
+* JSON
+* WASM
+* ONNX
+
+가능하면 사전 생성된 Brotli와 gzip 파일을 제공한다.
+
+ONNX 파일이 이미 압축 효율이 낮을 수 있으므로 실제 측정 후 결정한다.
+
+정확한 MIME type:
+
+application/wasm
+application/octet-stream
+application/json
+
+모델 파일에는 immutable cache header를 사용한다.
+
+예:
+
+Cache-Control: public, max-age=31536000, immutable
+
+manifest에는 짧은 캐시를 사용한다.
+
+19.4 보안 헤더
+
+실제 브라우저 기능과 충돌하지 않는 범위에서 다음을 설정한다.
+
+* Content-Security-Policy
+* Referrer-Policy
+* X-Content-Type-Options
+* Permissions-Policy
+* Cross-Origin-Opener-Policy
+* Cross-Origin-Embedder-Policy
+* Cross-Origin-Resource-Policy
+
+WASM threads와 SharedArrayBuffer 사용을 위해 cross-origin isolation이 필요한 경우 COOP/COEP를 올바르게 설정한다.
+
+모든 CDN 모델 자산이 CORP/CORS 정책과 호환되는지 테스트한다.
+
+⸻
+
+20. 개발 명령
+
+최소한 다음 명령을 제공한다.
+
+make setup
+make dev
+make lint
+make typecheck
+make test
+make test-web
+make test-wasm
+make test-python
+make test-e2e
+make data-kaggle
+make data-audit
+make features
+make train-baseline
+make train
+make evaluate
+make export-onnx
+make sync-model
+make build
+make docker-build
+make docker-run
+make benchmark
+make verify
+
+make verify는 다음을 모두 수행한다.
+
+* formatting
+* lint
+* TypeScript typecheck
+* Rust tests
+* Python tests
+* web unit tests
+* static export
+* ONNX validation
+* model manifest validation
+* Docker build
+* 기본 Playwright smoke test
+
+⸻
+
+21. 테스트
+
+21.1 웹 테스트
+
+* 모델 다운로드 진행률
+* 모델 캐시
+* 무결성 오류
+* WebGPU 성공
+* WebGPU 실패 후 WASM 폴백
+* 마이크 권한 거부
+* 녹음 취소
+* 음성 부족
+* clipping
+* 결과 화면
+* 공유 링크 encode/decode
+* 손상된 공유 링크
+* 버전이 다른 공유 링크
+* JSON/CSV/PNG 다운로드
+* 결과 삭제
+* 모델 캐시 삭제
+* 모바일 viewport
+* 키보드 접근성
+
+21.2 개인정보 테스트
+
+Playwright에서 네트워크 요청을 가로채 다음을 검증한다.
+
+* 녹음 이후 POST/PUT/PATCH 요청이 없음
+* Blob audio upload가 없음
+* PCM payload 전송이 없음
+* 분석 결과 전송이 없음
+* 공유 링크 생성 시 네트워크 요청이 없음
+* 외부 analytics 요청이 없음
+
+21.3 DSP 테스트
+
+Python reference와 Rust/WASM 결과를 비교한다.
+
+* resampling
+* FFT
+* STFT
+* spectral centroid
+* roll-off
+* flatness
+* F0
+* LPC
+* formants
+* HNR
+* CPP
+
+각 metric의 허용 오차를 문서화한다.
+
+21.4 모델 테스트
+
+* PyTorch vs ONNX
+* ONNX Python vs ONNX Web
+* WebGPU vs WASM
+* FP32 vs FP16
+* FP32 vs INT8
+* deterministic fixture
+* malformed input
+* zero input
+* short input
+* NaN/Inf 방지
+
+⸻
+
+22. 문서
+
+README에는 다음을 포함한다.
+
+* 프로젝트 목적
+* 핵심 개인정보 원칙
+* 아키텍처
+* 로컬 실행
+* 모델 다운로드
+* Kaggle 데이터 준비
+* RTX 3080 학습
+* metal 가소 학습
+* ONNX export
+* Docker 배포
+* 테스트
+* 브라우저 요구사항
+* 알려진 한계
+
+docs/model-card.md에는 다음을 포함한다.
+
+* 모델 목적
+* 학습 데이터
+* 라이선스
+* 라벨 의미
+* 지각 인상과 실제 성별의 차이
+* 평가 방법
+* subgroup 결과
+* 알려진 편향
+* 금지 용도
+* ONNX 변환
+* 양자화 영향
+* 브라우저 성능
+
+docs/data-card.md에는 다음을 포함한다.
+
+* 데이터셋 원본
+* 다운로드 일자
+* 체크섬
+* 라이선스
+* 파일 구조
+* 라벨
+* 화자 수
+* split
+* 제외 데이터
+* 중복 검사
+* 알려진 편향
+
+⸻
+
+23. 구현 순서
+
+다음 순서로 진행한다.
+
+Phase 1: 프로젝트 기반
+
+* 모노레포
+* Next.js static export
+* Rust WASM
+* Docker
+* 기본 CI
+* 플랫 UI 토큰
+
+Phase 2: 로컬 녹음과 입력 품질
+
+* AudioWorklet
+* ring buffer
+* 파일 입력
+* waveform
+* 품질 검사
+* Worker 통신
+
+Phase 3: DSP
+
+* FFT/STFT
+* F0
+* spectral features
+* LPC/formants
+* HNR/CPP
+* golden tests
+
+Phase 4: 데이터와 베이스라인
+
+* Kaggle 다운로드
+* 라이선스 검사
+* dataset audit
+* split
+* classical baseline
+* handcrafted MLP
+
+Phase 5: PyTorch 모델
+
+* Mel CNN
+* hybrid model
+* RTX 3080 config
+* training
+* evaluation
+* calibration
+
+Phase 6: ONNX
+
+* export
+* quantization
+* browser compatibility
+* WebGPU/WASM
+* model manifest
+* cache
+
+Phase 7: 결과 UI
+
+* 상단 경향 지표
+* 상세 분석
+* spectrogram
+* 음성 조정 가이드
+* 다운로드
+
+Phase 8: 공유와 개인정보
+
+* fragment payload
+* result viewer
+* privacy page
+* network privacy tests
+* storage controls
+
+Phase 9: 프로덕션
+
+* Nginx
+* security headers
+* compression
+* static caching
+* Docker Compose
+* performance benchmark
+* final verification
+
+각 Phase 종료 시 테스트를 실행하고 문서를 갱신한다.
+
+⸻
+
+24. 완료 조건
+
+다음 조건을 모두 충족해야 완료로 간주한다.
+
+* Next.js 정적 export 성공
+* Docker 이미지에서 모든 페이지 제공
+* 브라우저에서 모델 다운로드 진행률 표시
+* SHA-256 모델 검증 성공
+* 모델 캐시 재사용
+* WebGPU 추론 동작
+* WASM 폴백 동작
+* 원본 음성 서버 전송 없음
+* FFT와 spectrogram 동작
+* F0 동작
+* F1/F2/F3 동작
+* 상세 특징 표시
+* 상단 4개 이내 경향 점수 표시
+* 결과 JSON/CSV/PNG 다운로드
+* fragment 기반 링크 공유
+* 공유 링크에 원본 음성과 임베딩 미포함
+* 개인정보처리방침 제공
+* 사용자 데이터 삭제 기능
+* 모델 학습 명령 제공 및 학습 완료
+* Kaggle 라이선스와 파일 구조 자동 검사
+* PyTorch/ONNX/Web 출력 비교 테스트 통과
+* 모델 카드와 데이터 카드 완성
+* Playwright 개인정보 네트워크 테스트 통과
+* README 절차만으로 새 환경에서 재현 가능
+
+⸻
+
+25. 작업 원칙
+
+* 먼저 저장소와 환경을 검사한 뒤 구현한다.
+* 최신 안정 버전과 공식 문서를 기준으로 한다.
+* 라이브러리 API를 추측하지 않는다.
+* 테스트로 확인하지 않은 기능을 완료라고 하지 않는다.
+* 데이터 라이선스가 불명확하면 학습을 중단하고 기록한다.
+* 사용자의 음성을 서버로 보내는 우회 구현을 만들지 않는다.
+* 정적 호스팅 원칙을 깨는 서버 기능을 임의로 추가하지 않는다.
+* 실제 라벨이 없는 속성을 AI가 예측한다고 가장하지 않는다.
+* 분석 결과를 확률, 진단 또는 사실 확정처럼 표현하지 않는다.
+* 사용자 인터페이스에 긴 기술 설명이나 홍보성 AI 문구를 넣지 않는다.
+* 빌드, 학습, 변환, 브라우저 추론을 끝까지 실제로 검증한다.
+* 문제가 생기면 임시 mock으로 완료 처리하지 말고 원인과 제한을 문서화한다.
+
+최종 보고서에는 다음만 명확히 정리한다.
+
+1. 구현된 기능
+2. 저장소 구조
+3. 데이터셋 검사 결과
+4. 학습 결과
+5. 최종 모델 크기와 정확도
+6. 브라우저별 추론 성능
+7. PyTorch와 ONNX 수치 일치
+8. 개인정보 검증 결과
+9. Docker 실행 명령
+10. 남은 제한과 다음 개선사항

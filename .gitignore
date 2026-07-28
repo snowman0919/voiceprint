@@ -15,6 +15,9 @@ kaggle.json
 .DS_Store
 .playwright-cli/
 apps/web/public/wasm/
-apps/web/public/models/
+apps/web/public/models/*
+!apps/web/public/models/voice-4dim-vctk-101-v1.onnx
 apps/web/src/generated/
 ml/checkpoints/
+.opencode/
+과정.txt

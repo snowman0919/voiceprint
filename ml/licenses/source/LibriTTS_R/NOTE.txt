@@ -1,0 +1,13 @@
+The following data samples were removed from LibriTTS since the speech length in the audio is too short or file is broken.
+
+ - 1092_134562_000013_000004.wav  (train-other-500)
+ - 1092_134562_000014_000004.wav  (train-other-500)
+ - 1250_135777_000049_000013.wav  (train-other-500)
+ - 2574_128283_000018_000000.wav  (train-other-500)
+ - 335_125945_000018_000001.wav  (train-clean-360)
+ - 4936_28619_000022_000000.wav  (train-other-500)
+ - 4936_28619_000023_000000.wav  (train-other-500)
+ - 4945_29090_000021_000004.wav  (train-clean-360)
+ - 5784_36627_000003_000001.wav  (train-other-500)
+ - 8033_284028_000006_000000.wav  (train-other-500)
+ - 8753_297948_000033_000003.wav  (train-other-500)

@@ -18,6 +18,8 @@ dependencies = [
   "matplotlib>=3.9",
   "tensorboard>=2.18",
   "kaggle>=1.7",
+  "datasets>=5.0.0",
+  "soundfile>=0.14.0",
 ]
 
 [tool.uv]
