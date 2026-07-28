@@ -96,10 +96,14 @@ def main():
     base = Path(os.environ.get('VTAD_DIR', 'ml/data/vtad'))
     pair_dir = base / 'Dataset' / 'attribute_pair'
     
-    # Collect all comparisons from train.txt + seen.txt
+    # Collect comparisons from train.txt + seen.txt only.
+    # ponytail: unseen.txt excluded — it is VCTK-RVA's held-out eval tier.
+    # Including it would derive held-out speakers' labels from eval data (= leakage)
+    # and inflate speaker count past honestly-labeled 78. Upgrade path: acquire
+    # additional consented multi-rater sources to reach the 100-speaker gate cleanly.
     all_comparisons: dict[str, list[tuple[str, str]]] = defaultdict(list)
     
-    for fname in ['train.txt', 'seen.txt', 'unseen.txt']:
+    for fname in ['train.txt', 'seen.txt']:
         fpath = pair_dir / fname
         if fpath.exists():
             parsed = parse_comparisons(str(fpath))

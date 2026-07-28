@@ -2,6 +2,8 @@
 
 Voiceprint는 정적 export 웹 앱 + nginx 런타임으로 배포한다. 활성 모델(ONNX)과 manifest를 포함한 모든 자산이 빌드 시 한 번 만들어지고, 런타임에는 nginx와 정적 파일만 남는다.
 
+> **현재 상태(ACQUIRING_DATA)** — 활성 report 모델 없음. `model-manifest.json`은 `activeModel: null`, `models: []`. 직전 `voice-4dim-vctk-101-v1`은 평가 누수(`unseen.txt` 포함) + `stability` 자리 표시자로 철회. DSP와 정적 사이트 자체는 배포 가능하지만 report 값 출력은 비활성. 재활성 조건은 `docs/project-status.md`.
+
 ## 파이프라인 개요
 
 ```text
@@ -12,13 +14,13 @@ Voiceprint는 정적 export 웹 앱 + nginx 런타임으로 배포한다. 활성
   ├─ make build         next build → apps/web/out/
   │                       ├─ static pages (/, /about, /analyze, /privacy, /result, /settings)
   │                       ├─ wasm/*.wasm + glue .js
-  │                       ├─ models/voice-4dim-vctk-101-v1.onnx  (활성, 커밋됨)
-  │                       └─ model-manifest.json (activeModel + reportEligible)
+  │                       ├─ models/<활성 ONNX>  (게이트 통과 시 커밋; 현재 없음)
+  │                       └─ model-manifest.json (게이트 통과 시 activeModel 설정; 현재 null)
   └─ make docker-build  rust:1.96 → node:26 → nginx:1.29-alpine
                           runtime: nginx + /usr/share/nginx/html (정적 자산만)
 ```
 
-WASM 바이너리·JS 글루·out/은 gitignored라 클린 체크아웃에서는 빌드 스크립트가 생성해야 한다. 활성 ONNX는 저장소에 커밋되어 있어 빌드 없이도 serve 가능하다.
+WASM 바이너리·JS 글루·out/은 gitignored라 클린 체크아웃에서는 빌드 스크립트가 생성해야 한다. 활성 ONNX는 게이트 통과 시에만 force-add되어 저장소에 들어간다(`apps/web/public/models/` 전체 gitignored, 통과 모델 1개 `git add -f`). 현재 커밋된 활성 ONNX 없음.
 
 ## 빌드 단계
 
@@ -46,8 +48,8 @@ Next 빌드:
 
 ```sh
 ls apps/web/out/
-ls apps/web/out/models/     # voice-4dim-vctk-101-v1.onnx 있어야 함 (활성)
-cat apps/web/out/model-manifest.json | jq .activeModel   # "voice-4dim-vctk-101-v1"
+ls apps/web/out/models/     # 게이트 통과한 활성 ONNX 있어야 함 (현재 없음)
+cat apps/web/out/model-manifest.json | jq .activeModel   # null (ACQUIRING_DATA) / 게이트 통과 시 모델 ID
 ```
 
 ### 3. Docker 이미지 (`make docker-build`)
@@ -150,7 +152,7 @@ nginx 외 임의 정적 호스트(Vercel static, GitHub Pages, Cloudflare Pages,
 
 ## 릴리스 상태
 
-`docs/project-status.md`의 `REPORT_MODEL_ACTIVE`. 활성 모델은 `voice-4dim-vctk-101-v1`, report-eligibility 게이트 통과, manifest에 SHA-256 연쇄 기록. 낡은 TIS 학습 경로는 레거시 코퍼스 경로로 `docs/training.md`에 보존하고 활성 manifest에서는 사용하지 않는다.
+`docs/project-status.md`의 `ACQUIRING_DATA`. **활성 report 모델 없음.** `manifest.activeModel` = null. 직전 `voice-4dim-vctk-101-v1`은 평가 누수(`unseen.txt` 포함) + `stability` 자리 표시자로 철회. 재활성은 깨끗한 100+ 화자·3-dim 재학습 후 게이트 통과 시. 낡은 TIS 학습 경로는 레거시 코퍼스 경로로 `docs/training.md`에 보존하고 활성 manifest에서는 사용하지 않는다.
 
 ## 검증 산출물 체크리스트
 

@@ -2,23 +2,26 @@
 
 브라우저 안에서 녹음하거나 로컬 음성 파일의 음향 특징을 측정하고, 동의 기반 다중 청취자 평가 corpus로 학습한 ONNX 모델로 음성 인상을 추정하는 정적 웹 앱. 원본 음성·PCM·파형·특징·임베딩·분석 결과를 서버로 전송하지 않는다. 모든 처리는 클라이언트 메모리에서 끝난다.
 
-## 라이브 모델
+## 상태
 
-`apps/web/public/model-manifest.json`에 활성 모델 1개가 등록되어 있다.
+`apps/web/public/model-manifest.json`은 `activeModel: null`, `models: []`. **활성 report 모델 없음.** 상세는 `docs/project-status.md`(`ACQUIRING_DATA`).
 
-| 필드             | 값                                                |
-| ---------------- | ------------------------------------------------- |
-| `activeModel`    | `voice-4dim-vctk-101-v1`                          |
-| 출력 차원        | impression · brightness · softness · stability    |
-| 학습 데이터      | VCTK 0.92 (CC BY 4.0) + VCTK-RVA 다중 청취자 평점 |
-| 화자 수          | 101 (전체 다중 평자, 동의 corpus)                 |
-| held-out 화자    | 20 (val 10 · test 10, 화자 분리 분할)             |
-| ONNX 패리티      | max abs err `2.28e-28`                            |
-| calibration ECE  | `0.0897` (test split, 10-bin)                     |
-| `reportEligible` | `true`                                            |
-| 검증 SHA-256     | 활성 ONNX + report-evidence JSON 연쇄             |
+직전 커밋까지 활성화했던 `voice-4dim-vctk-101-v1`은 두 정당성 결함으로 철회:
 
-`stability` 출력은 `0.5` 상수 자리 표시자. 추론 결과로 해석하지 않는다. model card는 `ml/checkpoints/report-evidence-101.json`의 `modelCard` 필드에 명시.
+- **평가 누수** — `vtad_elo.py`가 VCTK-RVA의 `unseen.txt`(held-out 평가 페어)까지 Elo 입력으로 사용. held-out 화자 라벨이 평가 데이터로부터 도출되어 게이트 `heldOutSpeakerCount` 의미 위반. 23 화자는 `unseen.txt`에만 등장 → 라벨 100% 누수.
+- **`stability` 자리 표시자** — 4번째 출력 축 `stability`는 라벨 소스가 없어 `0.5` 상수. 모델이 항상 `0.5` 출력. "4차원 모델"로 배포하나 해석 가능 축은 3개.
+
+복원: `vtad_elo.py`는 `train.txt` + `seen.txt`만 사용(정직하게 라벨링 가능한 화자 78명). 누수 ONNX는 manifest + git에서 제거.
+
+DSP(WASM F0/스펙트럼/HNR)는 그대로 동작. 분석 페이지는 음향 특징 시각화까지 사용 가능.
+
+### 재활성 조건
+
+1. 동의 기반 다중 청취자 평점 소스 추가 확보로 깨끗하게 라벨링 가능한 화자 100+ 명
+2. `stability` 축 제거 → 3-dim(impression · brightness · softness) 재학습
+3. 화자 분리 분할 재생성(held-out 라벨은 평가 데이터 포함 금지)
+4. ONNX 내보내기 + fixture 추론 출력(`modelOutputs`)을 report-evidence JSON에 기록 + JSON을 커밋 위치(`ml/evidence/`)에 보관
+5. 게이트 통과 시에만 `reportEligible: true`, `activeModel` 설정
 
 ## 프라이버시 불변 규칙
 
@@ -45,7 +48,7 @@ make dev     # http://localhost:3000
 make build   # wasm-pack → next build (정적 export)
 ```
 
-출력: `apps/web/out/` 아래 정적 사이트. 활성 모델 ONNX와 manifest도 같이 복사된다.
+출력: `apps/web/out/` 아래 정적 사이트. manifest도 같이 복사된다(현재 `activeModel: null` → ONNX 파일 없음).
 
 참고 — `next build`는 `next.config.ts`에서 `typescript: { ignoreBuildErrors: true }` 설정. 이 환경에서 `tsc --noEmit` flat-config 로딩이 항(hang)하는 임시 회피. 실제 타입 검사는 `make typecheck`가 담당한다. 자세한 사정은 `docs/deployment.md`의 “빌드 환경 회피 항목” 절.
 
@@ -72,8 +75,8 @@ apps/web          Next.js 정적 export (App Router, output:"export", trailingSl
   src/workers     quality(model DSP), model(ONNX Runtime Web) worker
   src/generated   wasm-pack 생성 글루 (gitignored)
   public/wasm     WASM 바이너리 (gitignored, build-wasm.sh가 생성)
-  public/models   ONNX 모델 — 활성 1개만 커밋(.gitignore 네거션)
-  public/model-manifest.json   활성 모델 서술자
+  public/models   ONNX 모델 (gitignored, 게이트 통과 시 커밋 대상만 force-add)
+  public/model-manifest.json   모델 서술자 (현재 activeModel null)
 crates/voice-dsp  Rust WASM DSP (edition 2024, wasm-bindgen, rustfft, hound)
 ml                Python ML 파이프라인(uv 관리, PyTorch→ONNX)
   voiceprint_ml   데이터 감사·전처리·학습·평가·ONNX 내보내기·manifest 검증
@@ -86,9 +89,9 @@ fixtures/audio    deterministic 테스트 WAV (sine-220.wav 등)
 docs              architecture / privacy / model-card / data-card / training / validation / deployment
 ```
 
-## ML 파이프라인 — VCTK-101 (활성 모델 경로)
+## ML 파이프라인 (재학습 대상 형태)
 
-전 과정이 `consentedMultiRater` 게이트를 충족한다. 화자 분리 분할을 유지하며, 결정론적 라벨은 다중 청취자 Elo 평점에서 나온다.
+> **주의** — 아래 명령은 직전 101-화자 실행의 기록. 그 실행은 평가 누수(`unseen.txt` 포함) + `stability` 자리 표시자로 철회됐다(상태 절 참조). 명령의 *형태*는 재학습에도 그대로 쓰지만 입력 데이터는 깨끗한 100+ 화자·3-dim이어야 한다. 아래 수치(101/78, test_loss `0.0278`, ECE `0.0897` 등)는 철회된 실행의 것이므로 재실행시 교체.
 
 ### 0. 환경
 
@@ -103,16 +106,17 @@ make setup
 VCTK 0.92 원본 FLAC은 CC BY 4.0으로 공개. 동일한 화자에 대해 다중 청취자 평점(VCTK-RVA)으로 brightness·softness·impression 라벨을 만든다.
 
 ```sh
-# VCTK-RVA 비교 paired list(train/seen/unseen 3파일 합집합 = 101 화자)
+# VCTK-RVA 비교 paired list(train/seen만 사용, unseen=평가 페어 누수 방지)
 PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.vtad_elo
-# → ml/data/vtad/vtad_scores.json (brightness 101, softness 88, impression 96)
+# → ml/data/vtad/vtad_scores.json (train+seen only = 78 화자, 게이트 100 미달)
+#    추가 동의 다중 평자 소스(LibriTTS_R 등) 병합 후 100+ 도달이 재학습 전제
 ```
 
 ### 2. 전처리 + 화자 분리 분할
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.preprocess_vctk
-# → ml/data/vctk-processed/manifest.csv (40,892 rows, 101 spks)
+# → ml/data/vctk-processed/manifest.csv (화자 수 = vtad_elo 결과, 직전 실행 101 스펙은 철회)
 PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.split \
   ml/data/vctk-processed/manifest.csv \
   ml/data/vctk-processed/manifest-split.csv --seed 20260727
@@ -160,25 +164,25 @@ report-eligibility 게이트(`ml/voiceprint_ml/verify_manifest.py`)가 아래 �
 
 - `purpose == "voice-impression-report"`, `schemaVersion == 1`
 - `dataset.consentedMultiRater == true`
-- `dataset.speakerCount >= 100` (VCTK-101 = 101)
-- `evaluation.heldOutSpeakerCount >= 10` (val 10 + test 10 = 20)
+- `dataset.speakerCount >= 100` (직전 78 → 게이트 미달, 추가 동의 소스 필요)
+- `evaluation.heldOutSpeakerCount >= 10` (val + test, 평가 페어 라벨 사용 금지)
 - `evaluation.calibrationEce` 수치
 - `onnx.maxAbsoluteError` 수치
 - `modelCard` 비어있지 않은 문자열
 
 ```sh
 PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.create_manifest \
-  apps/web/public/models/voice-4dim-vctk-101-v1.onnx \
-  --model-id voice-4dim-vctk-101-v1 --version 1.0.0 --quantization none \
-  --report-eligible --report-evidence ml/checkpoints/report-evidence-101.json
-# activeModel 자동 설정, reportEligible true, manifest에 샤256 연쇄 기록
+  apps/web/public/models/<clean-model>.onnx \
+  --model-id <id> --version 1.0.0 --quantization none \
+  --report-eligible --report-evidence ml/evidence/<report-evidence.json>
+# 게이트 통과 시 activeModel 자동 설정, reportEligible true, 샤256 연쇄 기록
 PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest
-# {models:1, active:1} PASS
+# 게이트 미통과 시 activeModel 설정 거부 → {models:0} 로 재시도
 ```
 
 ### 7. 커밋
 
-활성 ONNX만 저장소에 들어간다(`.gitignore`가 `apps/web/public/models/*`를 무시하고 `!voice-4dim-vctk-101-v1.onnx`만 예외). 나머지 모델·체크포인트·증빙 JSON은 gitignored.
+`.gitignore`는 `apps/web/public/models/` 전체를 무시. 게이트 통과한 활성 ONNX 1개만 `git add -f`로 force-add. report-evidence JSON은 커밋되는 위치(`ml/evidence/`)에 → 감사·재현 가능. 체크포인트·나머지 모델은 gitignored.
 
 ## Docker
 
@@ -204,13 +208,13 @@ make docker-run     # http://localhost:8080
 - `docs/training.md` — 학습 파이프라인 절차(TIS 포함 레거시 경로)
 - `docs/validation.md` — 검증·벤치마크 결과
 - `docs/deployment.md` — 배포 파이프라인 (nginx, 압축, 보안 헤더, 빌드 환경 회피 항목)
-- `docs/project-status.md` — 릴리스 상태. 현재 `REPORT_MODEL_ACTIVE`.
+- `docs/project-status.md` — 릴리스 상태. 현재 `ACQUIRING_DATA` (활성 모델 없음, 평가 누수·자리 표시자 철회).
 - `goal.txt` — 제품 스펙 표준 참조(1888줄).
 
 ## 라이선스
 
 - 코드: 본 저장소 LICENSE 파일이 지정. 없으면 저장소 기본.
 - VCTK 0.92 원본 corpus: CC BY 4.0. 라이선스 사본 `ml/licenses/source/vctk-0.92-README.txt`.
-- VCTK-RVA 어노테이션·vTAD baseline 코드: `permission_required`. 학습에 사용한 평점 산출은 합집합 paired list(train/seen/unseen) 기반 동의 corpus 경로. 어노테이션 자체 재배포 금지.
+- VCTK-RVA 어노테이션·vTAD baseline 코드: `permission_required`. 학습에 사용한 평점 산출은 `train.txt` + `seen.txt` paired list 기반 동의 corpus 경로(`unseen.txt` = 평가 페어, 사용 제외). 어노테이션 자체 재배포 금지.
 - LibriTTS_R 라이선스 사본은 `ml/licenses/source/LibriTTS_R/`에 보관.
 - 활성 ONNX 모델: VCTK 원본 corpus 파생. 원본 CC BY 4.0 조건이 파생물에 적용된다.
