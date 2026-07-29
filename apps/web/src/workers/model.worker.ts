@@ -29,7 +29,9 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
         : wasm.resample_to_rate(source, data.sampleRate, data.model.inputSampleRate);
     const result = await runOnDeviceInference(session, modelPcm, data.model.inputSampleRate, data.model.inputSeconds);
     self.postMessage({ type: "result", backend: session.backend, ...result });
-  } catch {
-    self.postMessage({ type: "error", message: "이 기기에서 분석 모델을 시작할 수 없습니다." });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[model.worker] session failed:", err);
+    self.postMessage({ type: "error", message: `이 기기에서 분석 모델을 시작할 수 없습니다. (${message})` });
   }
 };
