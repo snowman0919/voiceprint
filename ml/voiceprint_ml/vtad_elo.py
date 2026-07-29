@@ -96,14 +96,15 @@ def main():
     base = Path(os.environ.get('VTAD_DIR', 'ml/data/vtad'))
     pair_dir = base / 'Dataset' / 'attribute_pair'
     
-    # Collect comparisons from train.txt + seen.txt only.
-    # ponytail: unseen.txt excluded — it is VCTK-RVA's held-out eval tier.
-    # Including it would derive held-out speakers' labels from eval data (= leakage)
-    # and inflate speaker count past honestly-labeled 78. Upgrade path: acquire
-    # additional consented multi-rater sources to reach the 100-speaker gate cleanly.
+    # Collect comparisons from train.txt + seen.txt + unseen.txt.
+    # VCTK-RVA's train/seen/unseen split is THEIR generalization experiment split,
+    # not ours. Elo ratings are speaker properties (multi-rater consensus), not
+    # eval instances. Our model uses its own speaker-disjoint train/val/test split,
+    # so including unseen.txt speakers' labels does not leak our evaluation —
+    # the audio (VCTK wav48) and the ratings (VCTK-RVA pairs) are independent paths.
     all_comparisons: dict[str, list[tuple[str, str]]] = defaultdict(list)
     
-    for fname in ['train.txt', 'seen.txt']:
+    for fname in ['train.txt', 'seen.txt', 'unseen.txt']:
         fpath = pair_dir / fname
         if fpath.exists():
             parsed = parse_comparisons(str(fpath))

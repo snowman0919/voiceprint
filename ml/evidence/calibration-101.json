@@ -1,0 +1,11 @@
+{
+  "calibrationEce": 0.08967091225713375,
+  "calibrationEcePerDim": {
+    "impression": 0.14648571610450745,
+    "brightness": 0.08176937699317932,
+    "softness": 0.13037942349910736,
+    "stability": 4.913243174087256e-05
+  },
+  "samples": 4047,
+  "bins": 10
+}
