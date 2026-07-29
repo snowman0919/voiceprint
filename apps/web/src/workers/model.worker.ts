@@ -30,8 +30,14 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
     const result = await runOnDeviceInference(session, modelPcm, data.model.inputSampleRate, data.model.inputSeconds);
     self.postMessage({ type: "result", backend: session.backend, ...result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[model.worker] session failed:", err);
+    const describe = (e: unknown, depth = 0): string => {
+      if (depth > 4 || e == null) return "";
+      const head = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      const cause = e instanceof Error ? (e as { cause?: unknown }).cause : undefined;
+      return head + (cause ? ` <= ${describe(cause, depth + 1)}` : "");
+    };
+    const message = describe(err);
+    console.error("[model.worker] session failed:", message, err);
     self.postMessage({ type: "error", message: `이 기기에서 분석 모델을 시작할 수 없습니다. (${message})` });
   }
 };
