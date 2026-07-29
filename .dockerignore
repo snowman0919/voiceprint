@@ -1,11 +1,14 @@
 .git
 .next
-out
+**/out
 target
-node_modules
+**/node_modules
 ml/data
 ml/.venv
-checkpoints
+ml/checkpoints
 artifacts
 .env
 .DS_Store
+**/.DS_Store
+*.log
+ml/evidence
