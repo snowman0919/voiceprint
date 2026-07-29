@@ -1,5 +1,5 @@
-const CACHE = "voiceprint-static-v1";
-const EXCLUDED = ["/models/", "/model-manifest.json"];
+const CACHE = "voiceprint-static-v2";
+const EXCLUDED = ["/models/", "/model-manifest.json", "/ort/", "/wasm/"];
 
 self.addEventListener("install", () => self.skipWaiting());
 
