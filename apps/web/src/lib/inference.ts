@@ -47,6 +47,11 @@ export function normalizeTisIntentOutput(values: ArrayLike<number>): TisIntentSc
 export async function createOnDeviceSession(modelBytes: ArrayBuffer): Promise<OnDeviceSession> {
   const loaded = await createSessionWithFallback(async (backend) => {
     const ort = backend === "webgpu" ? await import("onnxruntime-web/webgpu") : await import("onnxruntime-web/wasm");
+    // ponytail: wasmPaths must point at the vendored ORT wasm assets under /ort/.
+    // Static export has no default module resolution path; without this the WASM
+    // backend cannot locate ort-wasm-simd-threaded.{wasm,mjs} → load fails.
+    // Upgrade path: bundle ORT via a loader plugin if Next adds one.
+    if (backend === "wasm") ort.env.wasm.wasmPaths = "/ort/";
     const session = await ort.InferenceSession.create(modelBytes, { executionProviders: [backend] });
     return {
       session,

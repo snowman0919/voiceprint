@@ -1,10 +1,10 @@
-import { createOnDeviceSession, runTisIntentInference, warmUpOnDeviceSession } from "@/lib/inference";
+import { createOnDeviceSession, runOnDeviceInference, warmUpOnDeviceSession } from "@/lib/inference";
 import { modelCacheName, type ModelEntry } from "@/lib/model-cache";
 
 type Request =
   | { type: "warm"; model: Pick<ModelEntry, "url" | "inputSampleRate" | "inputSeconds"> }
   | {
-      type: "infer-tis";
+      type: "infer";
       model: Pick<ModelEntry, "url" | "inputSampleRate" | "inputSeconds">;
       pcm: ArrayBuffer;
       sampleRate: number;
@@ -27,14 +27,8 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
       data.sampleRate === data.model.inputSampleRate
         ? source
         : wasm.resample_to_rate(source, data.sampleRate, data.model.inputSampleRate);
-    const result = await runTisIntentInference(
-      session,
-      modelPcm,
-      data.model.inputSampleRate,
-      data.model.inputSampleRate,
-      data.model.inputSeconds,
-    );
-    self.postMessage({ type: "tis-result", backend: session.backend, ...result });
+    const result = await runOnDeviceInference(session, modelPcm, data.model.inputSampleRate, data.model.inputSeconds);
+    self.postMessage({ type: "result", backend: session.backend, ...result });
   } catch {
     self.postMessage({ type: "error", message: "이 기기에서 분석 모델을 시작할 수 없습니다." });
   }
