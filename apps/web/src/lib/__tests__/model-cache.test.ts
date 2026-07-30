@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { blockedResearchModel } from "../__fixtures__/blocked-report-manifest";
-import { allowsAutoDownload, validateManifest } from "../model-cache";
+import { allowsAutoDownload, cachedModel, downloadAndVerify, validateManifest } from "../model-cache";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("model manifest validation", () => {
   it("rejects an artifact without a SHA-256 digest before any model download", () => {
@@ -63,5 +65,16 @@ describe("model download policy", () => {
   it("does not spend a data-saver connection on a model download", () => {
     expect(allowsAutoDownload(true)).toBe(false);
     expect(allowsAutoDownload(false)).toBe(true);
+  });
+
+  it("fails clearly when Cache Storage is unavailable instead of referencing caches", async () => {
+    vi.stubGlobal("caches", undefined);
+    await expect(cachedModel(blockedResearchModel)).rejects.toThrow("Cache Storage");
+  });
+
+  it("fails before download when Web Crypto is unavailable instead of reading subtle.digest", async () => {
+    vi.stubGlobal("caches", { open: vi.fn(), delete: vi.fn() });
+    vi.stubGlobal("crypto", undefined);
+    await expect(downloadAndVerify(blockedResearchModel, vi.fn())).rejects.toThrow("Web Crypto");
   });
 });

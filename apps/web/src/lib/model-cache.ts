@@ -17,6 +17,16 @@ export type ModelManifest = { schemaVersion: 1; activeModel: string | null; mode
 
 export const modelCacheName = "voiceprint-models-v1";
 
+function requireCacheStorage() {
+  if (!globalThis.caches) throw new Error("이 브라우저는 모델 저장소(Cache Storage)를 지원하지 않습니다.");
+  return globalThis.caches;
+}
+
+function requireSubtleCrypto() {
+  if (!globalThis.crypto?.subtle) throw new Error("이 브라우저는 모델 무결성 검증(Web Crypto)을 지원하지 않습니다.");
+  return globalThis.crypto.subtle;
+}
+
 export function allowsAutoDownload(saveData: boolean | undefined) {
   return saveData !== true;
 }
@@ -82,18 +92,18 @@ export async function loadManifest() {
   return manifest;
 }
 
-export async function cachedModel(model: ModelEntry) {
-  return (await caches.open(modelCacheName)).match(model.url);
+export async function cachedModel(model: Pick<ModelEntry, "url">) {
+  return (await requireCacheStorage().open(modelCacheName)).match(model.url);
 }
 
-export async function cachedModelBytes(model: ModelEntry) {
+export async function cachedModelBytes(model: Pick<ModelEntry, "url">) {
   const response = await cachedModel(model);
   if (!response) throw new Error("검증된 로컬 모델이 없습니다.");
   return response.arrayBuffer();
 }
 
 export async function clearModelCache() {
-  await caches.delete(modelCacheName);
+  await requireCacheStorage().delete(modelCacheName);
 }
 
 function hex(bytes: ArrayBuffer) {
@@ -105,6 +115,8 @@ export async function downloadAndVerify(
   onProgress: (received: number) => void,
   signal?: AbortSignal,
 ) {
+  const storage = requireCacheStorage();
+  const subtle = requireSubtleCrypto();
   const response = await fetch(model.url, { signal, cache: "no-store" });
   if (!response.ok || !response.body) throw new Error("모델을 내려받을 수 없습니다.");
   const chunks: Uint8Array[] = [];
@@ -124,8 +136,8 @@ export async function downloadAndVerify(
     bytes.set(chunk, offset);
     offset += chunk.length;
   });
-  if (hex(await crypto.subtle.digest("SHA-256", bytes)) !== model.sha256.toLowerCase())
+  if (hex(await subtle.digest("SHA-256", bytes)) !== model.sha256.toLowerCase())
     throw new Error("모델 무결성 검증에 실패했습니다.");
   const verified = new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } });
-  await (await caches.open(modelCacheName)).put(model.url, verified);
+  await (await storage.open(modelCacheName)).put(model.url, verified);
 }
