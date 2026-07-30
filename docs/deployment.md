@@ -170,7 +170,8 @@ nginx 외 임의 정적 호스트(Vercel static, GitHub Pages, Cloudflare Pages,
 - [ ] 활성 모델이 있는 경우에만 ONNX 존재·SHA-256·releaseRights를 함께 확인
 - [ ] `apps/web/out/wasm/voice_dsp_bg.wasm` + `apps/web/out/wasm/voice_dsp.js` 존재
 - [ ] 정적 라우트 9개 디렉토리 각 `index.html` 존재
-- [ ] `make test-e2e` PASS → POST/PUT/PATCH 0건 + 외부 origin 요청 0건
+- [ ] `make test-e2e` PASS → 원본 음성 미전송, 동일 오리진 스칼라 결과 POST만
+  허용, 외부 origin 요청 0건
 - [ ] `verify_manifest` PASS → 현재 `{models:0, active:0}`
 - [ ] 활성 모델이 있는 경우에만 `validate_onnx` PASS → max abs err < 1e-4
 - [ ] Docker 빌드 성공 → `voiceprint:local` 이미지

@@ -17,7 +17,8 @@ manifest이며, 앱은 검증된 결정론적 음향 측정과 규칙 기반 오
 
 ## 프라이버시 불변 규칙
 
-- 녹음·분석 중 POST/PUT/PATCH 요청 0건 (Playwright E2E로 강제)
+- 녹음 원본·PCM·파형·프레임 배열 전송 0건. 분석 뒤 선택된 동일 오리진
+  `/api/results`에는 스칼라 결과만 POST 가능(Playwright E2E로 검증)
 - 분석 중 외부 origin 요청 0건
 - 결과 공유는 URL fragment `#share=...`로만. query param 사용 안 함. fragment에는 공유 비밀 토큰만 두고 결과는 SQLite에서 조회하며, 원본 오디오·PCM·임베딩·프레임 배열·마이크 기기명·파일 경로·브라우저 지문은 제외
 - nginx: CSP · COOP · COEP · Permissions-Policy(`microphone=self`) · X-Content-Type-Options · Referrer-Policy
@@ -58,7 +59,7 @@ make verify   # lint → typecheck → test → validate-model-manifest → dock
 | WASM DSP       | `make test-wasm`                                                     | Rust 단위+속성 테스트         |
 | ML manifest    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` | 패키지 모델 무결성·활성화 권한 게이트 |
 | ONNX 패리티    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.validate_onnx`   | PyTorch ↔ ONNX 수치 일치      |
-| E2E 프라이버시 | `make test-e2e`                                                      | POST/외부 요청 0건, 분석 렌더 |
+| E2E 프라이버시 | `make test-e2e`                                                      | 원본 음성 미전송·스칼라 결과만 저장·외부 origin 0건 |
 
 ## 구조
 
