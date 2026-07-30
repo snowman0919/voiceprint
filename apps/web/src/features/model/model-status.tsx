@@ -6,13 +6,27 @@ import type { InferenceBackend } from "@/lib/inference";
 
 type Status = "loading" | "unavailable" | "ready" | "downloading" | "error";
 
-export function ModelStatus() {
+type ModelStatusProps = { onStatusChange?: (status: Status) => void };
+
+export function modelErrorDetail(error: string | undefined) {
+  if (error?.includes("Cache Storage"))
+    return "이 브라우저의 비공개 모드 또는 저장소 제한을 해제한 뒤 다시 시도하세요.";
+  if (error?.includes("Web Crypto")) return "지원되는 최신 브라우저에서 HTTPS로 다시 열어 주세요.";
+  if (error?.includes("모델 크기")) return "다운로드가 불완전합니다. 네트워크를 확인한 뒤 다시 내려받으세요.";
+  if (error?.includes("무결성")) return "모델 파일 검증에 실패했습니다. 캐시를 지우고 다시 내려받으세요.";
+  if (error?.includes("검증된 로컬 모델")) return "모델이 아직 이 기기에 저장되지 않았습니다. 다시 내려받으세요.";
+  return "네트워크와 브라우저 지원 여부를 확인한 뒤 다시 시도하세요.";
+}
+
+export function ModelStatus({ onStatusChange }: ModelStatusProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [model, setModel] = useState<ModelEntry>();
   const [received, setReceived] = useState(0);
   const [error, setError] = useState<string>();
   const [backend, setBackend] = useState<InferenceBackend>();
   const abort = useRef<AbortController | null>(null);
+
+  useEffect(() => onStatusChange?.(status), [onStatusChange, status]);
 
   const startLocalSession = useCallback(async (active: ModelEntry, signal?: AbortSignal) => {
     const worker = new Worker(new URL("../../workers/model.worker.ts", import.meta.url));
@@ -149,6 +163,7 @@ export function ModelStatus() {
     <section aria-label="분석 모델 상태" className="model-status">
       <strong>모델 준비 실패</strong>
       <p>{error}</p>
+      <p>{modelErrorDetail(error)}</p>
       {model && (
         <button onClick={() => void download(model)} type="button">
           다시 시도

@@ -41,8 +41,10 @@ button {
 .model-status {
   display: grid;
   gap: 4px;
-  padding: 20px 0;
-  border-block: 1px solid #d9e0e8;
+  padding: 18px;
+  border: 1px solid #d9e0e8;
+  border-radius: var(--radius-lg);
+  background: #f8fbff;
 }
 .model-status p {
   color: #52606d;
