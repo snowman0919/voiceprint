@@ -21,6 +21,8 @@ export type SharedResultV1 = {
     f3Median?: number;
     hnr?: number;
     cpp?: number;
+    jitter?: number;
+    shimmer?: number;
     voicedRatio: number;
   };
   quality: { score: number; snr?: number; clippingRatio: number };
@@ -58,6 +60,8 @@ export type StoredResultV1 = SharedResultV1 & {
     formantSpacing?: number;
     estimatedVocalTractLength?: number;
     formantFrameSuccessRatio?: number;
+    jitter?: number;
+    shimmer?: number;
   };
 };
 

@@ -12,7 +12,7 @@ microphone/file -> AudioWorklet or local decoder -> Quality Worker -> Rust/WASM 
 
 Audio samples, PCM, trajectories, and embeddings remain in browser memory and are discarded after analysis. A user-selected model is fetched as a static asset, SHA-256 checked, then stored in Cache Storage. When the optional personal-result service is enabled, only the displayed scalar measurements are persisted; the share secret remains in the URL fragment while the result stays in SQLite.
 
-The source checkout keeps the model manifest empty because generated checkpoints and ONNX files are not committed. `make train-tis` and `make sync-tis-model` exercise the local ONNX pipeline only; the resulting TIS recording-condition model is not a report model and must not be deployed in the user-facing manifest. The app offers local acoustic measurements and deterministic expression rules until a purpose-specific, consented multi-rater model is available.
+The source checkout includes the verified `tis-intent-v1.onnx` static artifact so deployment packaging and ONNX Runtime Web compatibility can be checked. It has `reportEligible: false`, `activeModel: null`, and is never loaded for or shown in a user report: its recording-condition label does not match the product report. The app offers local acoustic measurements and deterministic expression rules until a purpose-specific, consented multi-rater model is available.
 
 ## Execution boundaries
 

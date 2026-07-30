@@ -19,6 +19,8 @@ export type DspSummary = {
   formantSpacingHz?: number;
   estimatedVocalTractLengthCm?: number;
   formantFrameSuccessRatio?: number;
+  jitterPercent?: number;
+  shimmerPercent?: number;
   spectralCentroidHz?: number;
   spectralBandwidthHz?: number;
   spectralRolloff85Hz?: number;
@@ -99,5 +101,19 @@ export function summarizeFormants(values: FormantTriplet[], attemptedFrames: num
     formantSpacingHz: spacing,
     estimatedVocalTractLengthCm: spacing > 0 ? 17_500 / spacing : undefined,
     formantFrameSuccessRatio: success,
+  };
+}
+
+/** Frame-level cycle-period and amplitude variation. Requires at least two voiced frames. */
+export function summarizeVoiceQuality(f0Values: number[], amplitudes: number[]): Pick<DspSummary, "jitterPercent" | "shimmerPercent"> {
+  const variation = (values: number[]) => {
+    if (values.length < 2) return undefined;
+    const mean = values.reduce((total, value) => total + value, 0) / values.length;
+    if (!Number.isFinite(mean) || mean <= 0) return undefined;
+    return (values.slice(1).reduce((total, value, index) => total + Math.abs(value - values[index]), 0) / (values.length - 1) / mean) * 100;
+  };
+  return {
+    jitterPercent: variation(f0Values.map((value) => 1 / value)),
+    shimmerPercent: variation(amplitudes),
   };
 }

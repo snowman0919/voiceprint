@@ -142,6 +142,12 @@ export default function ResultPage() {
             <dd>{Math.round(result.acoustic.f1Median)} / {Math.round(result.acoustic.f2Median ?? 0)} / {Math.round(result.acoustic.f3Median ?? 0)}Hz</dd>
           </div>
         )}
+        {result.acoustic.jitter !== undefined && (
+          <div>
+            <dt>프레임 변동 (jitter)</dt>
+            <dd>{result.acoustic.jitter.toFixed(2)}%</dd>
+          </div>
+        )}
         <div>
           <dt>입력 품질</dt>
           <dd>{result.quality.score}</dd>
@@ -201,6 +207,18 @@ export default function ResultPage() {
               <div>
                 <dt>포먼트 추적 성공률</dt>
                 <dd>{Math.round(result.details.formantFrameSuccessRatio * 100)}%</dd>
+              </div>
+            )}
+            {result.details.jitter !== undefined && (
+              <div>
+                <dt>프레임 변동 (jitter)</dt>
+                <dd>{result.details.jitter.toFixed(2)}%</dd>
+              </div>
+            )}
+            {result.details.shimmer !== undefined && (
+              <div>
+                <dt>진폭 변동 (shimmer)</dt>
+                <dd>{result.details.shimmer.toFixed(2)}%</dd>
               </div>
             )}
             {result.details.spectralCentroid !== undefined && (

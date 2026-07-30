@@ -336,6 +336,8 @@ export function Recorder() {
         f2Median: value.acousticFeatures.f2MedianHz,
         f3Median: value.acousticFeatures.f3MedianHz,
         hnr: value.acousticFeatures.hnrDb,
+        jitter: value.acousticFeatures.jitterPercent,
+        shimmer: value.acousticFeatures.shimmerPercent,
         voicedRatio: value.quality.voicedRatio,
       },
       quality: {
@@ -372,6 +374,8 @@ export function Recorder() {
         formantSpacing: value.acousticFeatures.formantSpacingHz,
         estimatedVocalTractLength: value.acousticFeatures.estimatedVocalTractLengthCm,
         formantFrameSuccessRatio: value.acousticFeatures.formantFrameSuccessRatio,
+        jitter: value.acousticFeatures.jitterPercent,
+        shimmer: value.acousticFeatures.shimmerPercent,
       },
     };
   }
@@ -533,6 +537,18 @@ export function Recorder() {
               <div>
                 <dt>HNR</dt>
                 <dd>{dsp.hnrDb.toFixed(1)}dB</dd>
+              </div>
+            )}
+            {dsp?.jitterPercent !== undefined && (
+              <div>
+                <dt>프레임 변동 (jitter)</dt>
+                <dd>{dsp.jitterPercent.toFixed(2)}%</dd>
+              </div>
+            )}
+            {dsp?.shimmerPercent !== undefined && (
+              <div>
+                <dt>진폭 변동 (shimmer)</dt>
+                <dd>{dsp.shimmerPercent.toFixed(2)}%</dd>
               </div>
             )}
             {dsp?.f1MedianHz !== undefined && (

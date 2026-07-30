@@ -1,6 +1,6 @@
 import { inspectAudio } from "@/lib/audio-quality";
 import { analysisConfig } from "@/lib/analysis-config";
-import { summarizeF0, summarizeFormants, type DspSummary, type FormantTriplet, type Spectrogram } from "@/lib/dsp";
+import { summarizeF0, summarizeFormants, summarizeVoiceQuality, type DspSummary, type FormantTriplet, type Spectrogram } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number; droppedFrames?: boolean };
@@ -20,12 +20,16 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   const f0: number[] = [];
   const hnr: number[] = [];
   const formants: FormantTriplet[] = [];
+  const voicedAmplitudes: number[] = [];
   stage("pitch");
   for (let frame = 0; frame < frameCount; frame += 1) {
     const offset = Math.floor((analysisPcm.length - frameSize) * (frameCount === 1 ? 0 : frame / (frameCount - 1)));
     const frameSamples = analysisPcm.subarray(offset, offset + frameSize);
     const value = wasm.estimate_f0_hz(frameSamples, analysisSampleRate);
-    if (Number.isFinite(value)) f0.push(value);
+    if (Number.isFinite(value)) {
+      f0.push(value);
+      voicedAmplitudes.push(Math.sqrt(frameSamples.reduce((total, sample) => total + sample * sample, 0) / frameSamples.length));
+    }
     const hnrValue = wasm.hnr_db(frameSamples, analysisSampleRate);
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
     const candidate = wasm.estimate_formants_wasm(frameSamples, analysisSampleRate);
@@ -100,6 +104,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   return {
     ...summarizeF0(f0),
     ...summarizeFormants(formants, frameCount),
+    ...summarizeVoiceQuality(f0, voicedAmplitudes),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
     spectralBandwidthHz: Number.isFinite(bandwidth) ? bandwidth : undefined,
     spectralRolloff85Hz: Number.isFinite(rolloff85) ? rolloff85 : undefined,

@@ -46,6 +46,8 @@ function validResult(value) {
       "f3Median",
       "hnr",
       "cpp",
+      "jitter",
+      "shimmer",
       "voicedRatio",
     ])
   )
@@ -96,6 +98,8 @@ function validResult(value) {
         "formantSpacing",
         "estimatedVocalTractLength",
         "formantFrameSuccessRatio",
+        "jitter",
+        "shimmer",
       ]) ||
       !Object.values(value.details).every((item) => item === undefined || isFiniteNumber(item)))
   )
