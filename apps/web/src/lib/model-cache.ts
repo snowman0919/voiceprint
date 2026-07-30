@@ -11,6 +11,7 @@ export type ModelEntry = {
   minimumAppVersion: string;
   /** True only after the data audit and held-out evaluation approve this report purpose. */
   reportEligible: boolean;
+  task?: "tis-intent";
   reportEvidenceSha256?: string;
   /** Present only for an active model with independently verified annotation and release rights. */
   releaseRights?: {
@@ -77,6 +78,7 @@ export function validateManifest(value: unknown): value is ModelManifest {
       typeof entry.minimumAppVersion === "string" &&
       entry.minimumAppVersion.length > 0 &&
       typeof entry.reportEligible === "boolean"
+      && (entry.task === undefined || entry.task === "tis-intent")
     );
   };
   return (

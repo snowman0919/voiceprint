@@ -1,11 +1,11 @@
-import { createOnDeviceSession, runOnDeviceInference, warmUpOnDeviceSession } from "@/lib/inference";
+import { createOnDeviceSession, runOnDeviceInference, runTisIntentInference, warmUpOnDeviceSession } from "@/lib/inference";
 import { cachedModelBytes, type ModelEntry } from "@/lib/model-cache";
 
 type Request =
   | { type: "warm"; model: Pick<ModelEntry, "url" | "inputSampleRate" | "inputSeconds"> }
   | {
       type: "infer";
-      model: Pick<ModelEntry, "url" | "inputSampleRate" | "inputSeconds">;
+      model: Pick<ModelEntry, "url" | "inputSampleRate" | "inputSeconds" | "task">;
       pcm: ArrayBuffer;
       sampleRate: number;
     };
@@ -19,6 +19,11 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
       return;
     }
     const source = new Float32Array(data.pcm);
+    if (data.model.task === "tis-intent") {
+      const result = await runTisIntentInference(session, source, data.sampleRate, data.model.inputSampleRate, data.model.inputSeconds);
+      self.postMessage({ type: "result", backend: session.backend, tisIntent: result });
+      return;
+    }
     const wasm = await import("@/generated/voice_dsp.js");
     await wasm.default(new URL("/wasm/voice_dsp_bg.wasm", self.location.origin));
     const modelPcm =

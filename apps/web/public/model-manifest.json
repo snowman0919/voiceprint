@@ -13,7 +13,8 @@
       "opset": 18,
       "quantization": "none",
       "minimumAppVersion": "0.1.0",
-      "reportEligible": false
+      "reportEligible": false,
+      "task": "tis-intent"
     }
   ]
 }

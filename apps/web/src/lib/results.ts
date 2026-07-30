@@ -24,7 +24,7 @@ export type LocalAnalysis = {
   acousticFeatures: DspSummary;
   voiceImpression: VoiceImpressionSpectrum;
   acousticSummary: AcousticTendency[];
-  modelOutputs: null;
+  modelOutputs: { tisIntent: { score: number; windows: number; backend: "webgpu" | "wasm" } } | null;
   practiceGoal: PracticeGoal;
   recommendations: string[];
 };
@@ -104,13 +104,14 @@ export function createLocalAnalysis(
   appVersion: string,
   dspVersion: string,
   practiceGoal: PracticeGoal = "clarity",
+  modelOutputs: LocalAnalysis["modelOutputs"] = null,
 ): LocalAnalysis {
   const score = boundedScore(100 - quality.clippingRatio * 1_000 - quality.silenceRatio * 25);
   return {
     schemaVersion: 1,
     createdAt: new Date().toISOString(),
     appVersion,
-    modelVersion: "not-deployed",
+    modelVersion: modelOutputs ? "tis-intent-v1" : "not-deployed",
     dspVersion,
     input,
     quality: {
@@ -120,7 +121,7 @@ export function createLocalAnalysis(
     acousticFeatures: dsp,
     voiceImpression: voiceImpressionSpectrum(dsp),
     acousticSummary: acousticTendencies(quality, dsp),
-    modelOutputs: null,
+    modelOutputs,
     practiceGoal,
     recommendations: recommendations(quality, dsp, practiceGoal),
   };

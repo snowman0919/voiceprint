@@ -10,6 +10,7 @@ import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/
 import { saveResult, type SavedResult } from "@/lib/result-store";
 import type { StoredResultV1 } from "@/lib/share";
 import { minimumRecordingSeconds, readingScripts } from "@/lib/reading-scripts";
+import { cachedModel, downloadAndVerify, loadManifest, type ModelEntry } from "@/lib/model-cache";
 import { F0Contour } from "./f0-contour";
 import { Spectrogram } from "./spectrogram";
 
@@ -60,6 +61,7 @@ export function Recorder() {
   const meter = useRef<number | undefined>(undefined);
   const startedAt = useRef(0);
   const pendingAudio = useRef<AudioBuffer | null>(null);
+  const analysisPcm = useRef<Float32Array | null>(null);
   const cancelWorker = useRef<(() => void) | undefined>(undefined);
   const [pendingRange, setPendingRange] = useState<PendingRange>();
 
@@ -93,6 +95,7 @@ export function Recorder() {
     setAnalysisStage("input");
     setAnalysis(undefined);
     setSavedResult(undefined);
+    analysisPcm.current = pcm.slice();
     try {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>(
         (resolve, reject) => {
@@ -291,6 +294,16 @@ export function Recorder() {
     setShareUrl(undefined);
     setSavedResult(undefined);
     setAnalysisStage("model");
+    let modelOutputs: LocalAnalysis["modelOutputs"] = null;
+    const pcm = analysisPcm.current;
+    try {
+      if (pcm) modelOutputs = await inferTisModel(pcm.slice(), input.sampleRate);
+    } catch {
+      setMessage("ONNX 모델을 사용할 수 없어 음향 측정 결과만 저장했습니다.");
+    } finally {
+      if (pcm) pcm.fill(0);
+      analysisPcm.current = null;
+    }
     const local = createLocalAnalysis(
       {
         sampleRate: input.sampleRate,
@@ -302,6 +315,7 @@ export function Recorder() {
       brand.appVersion,
       brand.dspVersion,
       practiceGoal,
+      modelOutputs,
     );
     setAnalysis(local);
     try {
@@ -313,6 +327,27 @@ export function Recorder() {
     } finally {
       setAnalysisStage(undefined);
     }
+  }
+
+  async function inferTisModel(pcm: Float32Array, sampleRate: number): Promise<NonNullable<LocalAnalysis["modelOutputs"]>> {
+    const manifest = await loadManifest();
+    const model = manifest.models.find((entry): entry is ModelEntry & { task: "tis-intent" } => entry.task === "tis-intent");
+    if (!model) throw new Error("TIS ONNX 모델이 없습니다.");
+    if (!(await cachedModel(model))) await downloadAndVerify(model, () => {});
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(new URL("../../workers/model.worker.ts", import.meta.url));
+      worker.onmessage = ({ data }) => {
+        worker.terminate();
+        if (data.type === "error") reject(new Error(data.message));
+        else if (data.tisIntent) resolve({ tisIntent: { ...data.tisIntent, backend: data.backend } });
+        else reject(new Error("TIS ONNX 모델 출력이 없습니다."));
+      };
+      worker.onerror = () => {
+        worker.terminate();
+        reject(new Error("TIS ONNX 모델을 시작할 수 없습니다."));
+      };
+      worker.postMessage({ type: "infer", model, pcm: pcm.buffer, sampleRate }, [pcm.buffer]);
+    });
   }
 
   function sharedResult(value: LocalAnalysis): StoredResultV1 {
@@ -604,10 +639,8 @@ export function Recorder() {
             <p className="eyebrow">결과</p>
             <h2 id="result-heading">측정된 음향 특징</h2>
           </div>
-          <p>아래는 이 녹음에서 관측한 음향 특징과 사전 정의한 규칙 기반 인상 지표입니다.</p>
           <section aria-label="측정 기반 음향 경향" className="model-result">
             <h3>측정 기반 음향 경향</h3>
-            <p>확률이나 개인 특성 판단이 아닌, 이 녹음에서 측정한 상대 지표입니다.</p>
             <div className="tendencies">
               {analysis.acousticSummary.map((tendency) => (
                 <div key={tendency.label}>
@@ -619,12 +652,18 @@ export function Recorder() {
                 </div>
               ))}
             </div>
-            <p className="safety">
-              음성 특징 기반의 오락용 인상 지표입니다. 성별·성 정체성·성격을 판정하지 않으며, 녹음 조건과 발화 상황에
-              따라 달라질 수 있습니다. ‘남성성’과 ‘여성성’은 우열이나 고정된 기준이 아닌 연속적인 표현 경향을 설명하기
-              위한 친숙한 표현입니다.
-            </p>
           </section>
+          {analysis.modelOutputs && (
+            <section aria-label="ONNX 분석" className="model-result">
+              <h3>ONNX 분석</h3>
+              <div className="tendencies">
+                <div>
+                  <strong>TIS 모델 점수</strong>
+                  <span>{analysis.modelOutputs.tisIntent.score}%</span>
+                </div>
+              </div>
+            </section>
+          )}
           <dl className="quality">
             <div>
               <dt>F0 중앙값</dt>
