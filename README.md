@@ -4,22 +4,16 @@
 
 ## 상태
 
-`apps/web/public/model-manifest.json`에 활성 모델 1개 등록. `activeModel: voice-4dim-vctk-101-v1`, `reportEligible: true`. 상세는 `docs/project-status.md`(`REPORT_MODEL_ACTIVE`).
+현재 활성 학습 모델은 없습니다. `apps/web/public/model-manifest.json`은 빈
+manifest이며, 앱은 검증된 결정론적 음향 측정과 규칙 기반 오락용 인상 지표로
+동작합니다. 상세 상태는 `docs/project-status.md`를 참조하세요.
 
-| 필드             | 값                                                |
-| ---------------- | ------------------------------------------------- |
-| `activeModel`    | `voice-4dim-vctk-101-v1`                          |
-| 출력 차원        | impression · brightness · softness · stability    |
-| 학습 데이터      | VCTK 0.92 (CC BY 4.0) + VCTK-RVA 다중 청취자 평점 |
-| 화자 수          | 101 (train/seen/unseen 합집합, 동의 corpus)       |
-| held-out 화자    | 20 (val 10 · test 10, 화자 분리 분할)             |
-| ONNX 패리티      | max abs err `2.28e-28`                            |
-| calibration ECE  | `0.0897` (test split, 10-bin)                     |
-| `reportEligible` | `true`                                            |
-| 검증 SHA-256     | 활성 ONNX + report-evidence JSON 연쇄             |
-| evidence JSON    | `ml/evidence/report-evidence-101.json` (커밋됨)   |
-
-`stability` 출력은 `0.5` 상수 자리 표시자. 추론 결과로 해석하지 않는다. model card는 `ml/evidence/report-evidence-101.json`의 `modelCard` 필드에 명시.
+| 필드 | 값 |
+| --- | --- |
+| 활성 모델 | 없음 (`activeModel: null`) |
+| 사용자 결과 | F0·스펙트럼·HNR·입력 품질과 명시적 규칙 |
+| 오락성 지표 | 음높이·스펙트럼 균형 기반의 상대 경향, 확률 아님 |
+| VCTK-RVA 파생 ONNX | 권한 미확인으로 배포·활성화하지 않음 |
 
 ## 프라이버시 불변 규칙
 
@@ -46,7 +40,8 @@ make dev     # http://localhost:3000
 make build   # wasm-pack → next build (정적 export)
 ```
 
-출력: `apps/web/out/` 아래 정적 사이트. 활성 모델 ONNX와 manifest도 같이 복사된다.
+출력: `apps/web/out/` 아래 정적 사이트와 빈 모델 manifest. 권한이 검증된
+모델이 생길 때만 ONNX를 명시적으로 포함한다.
 
 참고 — `next build`는 `next.config.ts`에서 `typescript: { ignoreBuildErrors: true }` 설정. 이 환경에서 `tsc --noEmit` flat-config 로딩이 항(hang)하는 임시 회피. 실제 타입 검사는 `make typecheck`가 담당한다. 자세한 사정은 `docs/deployment.md`의 “빌드 환경 회피 항목” 절.
 
@@ -61,7 +56,7 @@ make verify   # lint → typecheck → test → validate-model-manifest → dock
 | 게이트         | 단독 명령                                                            | 의미                          |
 | -------------- | -------------------------------------------------------------------- | ----------------------------- |
 | WASM DSP       | `make test-wasm`                                                     | Rust 단위+속성 테스트         |
-| ML manifest    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` | 활성 모델 report 자격 검증    |
+| ML manifest    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest` | 패키지 모델 무결성·활성화 권한 게이트 |
 | ONNX 패리티    | `PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.validate_onnx`   | PyTorch ↔ ONNX 수치 일치      |
 | E2E 프라이버시 | `make test-e2e`                                                      | POST/외부 요청 0건, 분석 렌더 |
 
@@ -74,7 +69,7 @@ apps/web          Next.js 정적 export (App Router, output:"export", trailingSl
   src/generated   wasm-pack 생성 글루 (gitignored)
   public/wasm     WASM 바이너리 (gitignored, build-wasm.sh가 생성)
   public/models   ONNX 모델 — 활성 1개만 커밋(.gitignore 네거션)
-  public/model-manifest.json   활성 모델 서술자
+  public/model-manifest.json   활성화 권한을 통과한 모델만 서술
 crates/voice-dsp  Rust WASM DSP (edition 2024, wasm-bindgen, rustfft, hound)
 ml                Python ML 파이프라인(uv 관리, PyTorch→ONNX)
   voiceprint_ml   데이터 감사·전처리·학습·평가·ONNX 내보내기·manifest 검증
@@ -87,7 +82,14 @@ fixtures/audio    deterministic 테스트 WAV (sine-220.wav 등)
 docs              architecture / privacy / model-card / data-card / training / validation / deployment
 ```
 
-## ML 파이프라인 — VCTK-101 (활성 모델 경로)
+## Historical ML trace — VCTK-101 (disabled)
+
+The following records a past local research run for audit only. VCTK-RVA
+annotation and baseline-code rights remain unresolved, so it must not be run
+against the real annotations, used to recreate a checkpoint, or used to
+activate a report model. The former ONNX file is deliberately not in this
+repository. A future model needs the explicit rights gate described in
+`docs/project-status.md` before any of these release steps are applicable.
 
 전 과정이 `consentedMultiRater` 게이트를 충족한다. 화자 분리 분할을 유지하며, 결정론적 라벨은 다중 청취자 Elo 평점에서 나온다.
 
@@ -179,7 +181,8 @@ PYTHONPATH=ml ml/.venv/bin/python -m voiceprint_ml.verify_manifest
 
 ### 7. 커밋
 
-활성 ONNX만 저장소에 들어간다(`.gitignore`가 `apps/web/public/models/*`를 무시하고 `!voice-4dim-vctk-101-v1.onnx`만 예외). report-evidence JSON은 `ml/evidence/`에 커밋되어 감사·재현 가능. 나머지 모델·체크포인트는 gitignored.
+ONNX·체크포인트·학습 데이터는 저장소에 넣지 않는다. `ml/evidence/`의 과거
+evidence JSON은 감사 기록일 뿐, 현재 배포 권한이나 활성화를 뜻하지 않는다.
 
 ## Docker
 
@@ -205,13 +208,15 @@ make docker-run     # http://localhost:8080
 - `docs/training.md` — 학습 파이프라인 절차(TIS 포함 레거시 경로)
 - `docs/validation.md` — 검증·벤치마크 결과
 - `docs/deployment.md` — 배포 파이프라인 (nginx, 압축, 보안 헤더, 빌드 환경 회피 항목)
-- `docs/project-status.md` — 릴리스 상태. 현재 `REPORT_MODEL_ACTIVE`.
+- `docs/project-status.md` — 릴리스 상태. 현재 `DATA_REASSESSMENT_REQUIRED`.
 - `goal.txt` — 제품 스펙 표준 참조(1888줄).
 
 ## 라이선스
 
 - 코드: 본 저장소 LICENSE 파일이 지정. 없으면 저장소 기본.
 - VCTK 0.92 원본 corpus: CC BY 4.0. 라이선스 사본 `ml/licenses/source/vctk-0.92-README.txt`.
-- VCTK-RVA 어노테이션·vTAD baseline 코드: `permission_required`. 학습에 사용한 평점 산출은 합집합 paired list(train/seen/unseen) 기반 동의 corpus 경로. 어노테이션 자체 재배포 금지.
+- VCTK-RVA 어노테이션·vTAD baseline 코드: `permission_required`. 실제
+  annotation 학습·캐시·checkpoint 배포·공개 서비스 사용은 금지 상태다.
 - LibriTTS_R 라이선스 사본은 `ml/licenses/source/LibriTTS_R/`에 보관.
-- 활성 ONNX 모델: VCTK 원본 corpus 파생. 원본 CC BY 4.0 조건이 파생물에 적용된다.
+- 활성 ONNX 모델은 없다. CC BY 원본 오디오 권한만으로 annotation 파생 모델의
+  배포 권한을 추정하지 않는다.

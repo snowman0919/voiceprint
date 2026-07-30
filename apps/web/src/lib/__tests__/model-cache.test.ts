@@ -59,6 +59,48 @@ describe("model manifest validation", () => {
     };
     expect(validateManifest({ schemaVersion: 1, activeModel: model.id, models: [model] })).toBe(false);
   });
+
+  it("rejects a report model with an evidence digest but no verified release rights", () => {
+    const model = {
+      id: "v1",
+      version: "1",
+      url: "/models/v1.onnx",
+      size: 1,
+      sha256: "a".repeat(64),
+      inputSampleRate: 16000,
+      inputSeconds: 4,
+      opset: 18,
+      quantization: "none",
+      minimumAppVersion: "0.1.0",
+      reportEligible: true,
+      reportEvidenceSha256: "b".repeat(64),
+    };
+    expect(validateManifest({ schemaVersion: 1, activeModel: model.id, models: [model] })).toBe(false);
+  });
+
+  it("accepts an active report model only when all release rights are explicit", () => {
+    const model = {
+      id: "v1",
+      version: "1",
+      url: "/models/v1.onnx",
+      size: 1,
+      sha256: "a".repeat(64),
+      inputSampleRate: 16000,
+      inputSeconds: 4,
+      opset: 18,
+      quantization: "none",
+      minimumAppVersion: "0.1.0",
+      reportEligible: true,
+      reportEvidenceSha256: "b".repeat(64),
+      releaseRights: {
+        annotationLicenseVerified: true,
+        trainingAllowed: true,
+        modelDistributionAllowed: true,
+        publicServiceAllowed: true,
+      },
+    };
+    expect(validateManifest({ schemaVersion: 1, activeModel: model.id, models: [model] })).toBe(true);
+  });
 });
 
 describe("model download policy", () => {

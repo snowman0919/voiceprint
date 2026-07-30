@@ -21,6 +21,18 @@ def verify_manifest(manifest_path: Path, public_root: Path) -> dict[str, int]:
             raise ValueError("model URL must remain under /models/")
         if not isinstance(model.get("reportEligible"), bool):
             raise ValueError("model report eligibility must be explicit")
+        if model["reportEligible"]:
+            rights = model.get("releaseRights")
+            if not isinstance(rights, dict) or not all(
+                rights.get(key) is True
+                for key in (
+                    "annotationLicenseVerified",
+                    "trainingAllowed",
+                    "modelDistributionAllowed",
+                    "publicServiceAllowed",
+                )
+            ):
+                raise ValueError("an active report model requires verified annotation and release rights")
         artifact = public_root / model["url"].lstrip("/")
         if not artifact.is_file():
             raise ValueError(f"model artifact is missing: {artifact}")

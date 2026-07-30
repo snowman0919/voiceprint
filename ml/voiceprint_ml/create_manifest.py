@@ -16,6 +16,7 @@ def report_evidence_digest(path: Path | None, model_id: str, version: str) -> st
         dataset = payload["dataset"]
         evaluation = payload["evaluation"]
         onnx = payload["onnx"]
+        rights = payload["rights"]
         valid = (
             payload["schemaVersion"] == 1
             and payload["purpose"] == "voice-impression-report"
@@ -31,12 +32,33 @@ def report_evidence_digest(path: Path | None, model_id: str, version: str) -> st
             and isinstance(onnx["maxAbsoluteError"], (int, float))
             and isinstance(payload["modelCard"], str)
             and payload["modelCard"]
+            and all(
+                rights.get(key) is True
+                for key in (
+                    "annotationLicenseVerified",
+                    "trainingAllowed",
+                    "modelDistributionAllowed",
+                    "publicServiceAllowed",
+                )
+            )
         )
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise ValueError("report-evidence is incomplete or invalid") from error
     if not valid:
         raise ValueError("report-evidence does not meet the report-model release gate")
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def report_release_rights(path: Path, model_id: str, version: str) -> dict[str, bool]:
+    """Return release rights only after the evidence gate has validated them."""
+    report_evidence_digest(path, model_id, version)
+    rights = json.loads(path.read_text(encoding="utf-8"))["rights"]
+    return {
+        "annotationLicenseVerified": rights["annotationLicenseVerified"],
+        "trainingAllowed": rights["trainingAllowed"],
+        "modelDistributionAllowed": rights["modelDistributionAllowed"],
+        "publicServiceAllowed": rights["publicServiceAllowed"],
+    }
 
 
 def create_manifest(
@@ -58,6 +80,7 @@ def create_manifest(
         raise ValueError("model manifest arguments are incomplete")
     payload = model.read_bytes()
     evidence_sha256 = report_evidence_digest(report_evidence, model_id, version) if report_eligible else None
+    release_rights = report_release_rights(report_evidence, model_id, version) if report_eligible and report_evidence else None
     return {
         "schemaVersion": 1,
         "activeModel": model_id if report_eligible else None,
@@ -74,6 +97,7 @@ def create_manifest(
             "minimumAppVersion": minimum_app_version,
             "reportEligible": report_eligible,
             **({"reportEvidenceSha256": evidence_sha256} if evidence_sha256 else {}),
+            **({"releaseRights": release_rights} if release_rights else {}),
         }],
     }
 

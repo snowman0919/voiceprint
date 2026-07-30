@@ -1,20 +1,5 @@
 {
   "schemaVersion": 1,
-  "activeModel": "voice-4dim-vctk-101-v1",
-  "models": [
-    {
-      "id": "voice-4dim-vctk-101-v1",
-      "version": "1.0.0",
-      "url": "/models/voice-4dim-vctk-101-v1.onnx",
-      "size": 659401,
-      "sha256": "07c0b51347092e8072fa2462fe3938906b035ba72a6fc4d3a9b1c058e1a02724",
-      "inputSampleRate": 16000,
-      "inputSeconds": 20,
-      "opset": 18,
-      "quantization": "none",
-      "minimumAppVersion": "0.1.0",
-      "reportEligible": true,
-      "reportEvidenceSha256": "ecb37a49b4d1ed18792970ac69d46e3a01e21fb21398a66d1604f40e0119af5e"
-    }
-  ]
+  "activeModel": null,
+  "models": []
 }

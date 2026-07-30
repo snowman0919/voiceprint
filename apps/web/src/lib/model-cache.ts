@@ -12,6 +12,13 @@ export type ModelEntry = {
   /** True only after the data audit and held-out evaluation approve this report purpose. */
   reportEligible: boolean;
   reportEvidenceSha256?: string;
+  /** Present only for an active model with independently verified annotation and release rights. */
+  releaseRights?: {
+    annotationLicenseVerified: true;
+    trainingAllowed: true;
+    modelDistributionAllowed: true;
+    publicServiceAllowed: true;
+  };
 };
 export type ModelManifest = { schemaVersion: 1; activeModel: string | null; models: ModelEntry[] };
 
@@ -80,7 +87,11 @@ export function validateManifest(value: unknown): value is ModelManifest {
           model.id === manifest.activeModel &&
           model.reportEligible &&
           typeof model.reportEvidenceSha256 === "string" &&
-          /^[a-f0-9]{64}$/i.test(model.reportEvidenceSha256),
+          /^[a-f0-9]{64}$/i.test(model.reportEvidenceSha256) &&
+          model.releaseRights?.annotationLicenseVerified === true &&
+          model.releaseRights.trainingAllowed === true &&
+          model.releaseRights.modelDistributionAllowed === true &&
+          model.releaseRights.publicServiceAllowed === true,
       ))
   );
 }

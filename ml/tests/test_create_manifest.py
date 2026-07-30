@@ -11,7 +11,7 @@ from voiceprint_ml.verify_manifest import verify_manifest
 class ModelManifestTests(unittest.TestCase):
     @staticmethod
     def report_evidence(path: Path, model_id: str = "model", version: str = "1.0.0") -> Path:
-        path.write_text(json.dumps({"schemaVersion": 1, "purpose": "voice-impression-report", "modelId": model_id, "modelVersion": version, "dataset": {"consentedMultiRater": True, "speakerCount": 100}, "evaluation": {"heldOutSpeakerCount": 10, "calibrationEce": 0.05}, "onnx": {"maxAbsoluteError": 0.00001}, "modelCard": "docs/model-card.md"}), encoding="utf-8")
+        path.write_text(json.dumps({"schemaVersion": 1, "purpose": "voice-impression-report", "modelId": model_id, "modelVersion": version, "dataset": {"consentedMultiRater": True, "speakerCount": 100}, "evaluation": {"heldOutSpeakerCount": 10, "calibrationEce": 0.05}, "onnx": {"maxAbsoluteError": 0.00001}, "rights": {"annotationLicenseVerified": True, "trainingAllowed": True, "modelDistributionAllowed": True, "publicServiceAllowed": True}, "modelCard": "docs/model-card.md"}), encoding="utf-8")
         return path
 
     def test_manifest_hashes_the_exact_browser_artifact(self) -> None:
@@ -66,6 +66,7 @@ class ModelManifestTests(unittest.TestCase):
             self.assertEqual(manifest["activeModel"], "model")
             self.assertTrue(manifest["models"][0]["reportEligible"])
             self.assertRegex(manifest["models"][0]["reportEvidenceSha256"], r"^[a-f0-9]{64}$")
+            self.assertTrue(manifest["models"][0]["releaseRights"]["publicServiceAllowed"])
 
     def test_report_activation_requires_multirater_and_held_out_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -73,6 +74,17 @@ class ModelManifestTests(unittest.TestCase):
             artifact.write_bytes(b"reference-bytes")
             with self.assertRaisesRegex(ValueError, "report-evidence"):
                 create_manifest(artifact, model_id="model", version="1.0.0", input_sample_rate=16_000, input_seconds=4, opset=18, quantization="none", minimum_app_version="0.1.0", report_eligible=True)
+
+    def test_report_activation_requires_verified_annotation_and_release_rights(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "model.onnx"
+            artifact.write_bytes(b"reference-bytes")
+            evidence = self.report_evidence(Path(directory) / "evidence.json")
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            payload["rights"]["publicServiceAllowed"] = False
+            evidence.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "release gate"):
+                create_manifest(artifact, model_id="model", version="1.0.0", input_sample_rate=16_000, input_seconds=4, opset=18, quantization="none", minimum_app_version="0.1.0", report_eligible=True, report_evidence=evidence)
 
     def test_packaging_rejects_an_active_non_report_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1,6 +1,8 @@
 # Deployment
 
-Voiceprint는 정적 export 웹 앱 + nginx 런타임으로 배포한다. 활성 모델(ONNX)과 manifest를 포함한 모든 자산이 빌드 시 한 번 만들어지고, 런타임에는 nginx와 정적 파일만 남는다.
+Voiceprint는 정적 export 웹 앱 + nginx 런타임으로 배포한다. WASM과 빈
+model manifest를 포함한 자산이 빌드 시 한 번 만들어지고, 런타임에는 nginx와
+정적 파일만 남는다. 권한 게이트를 통과한 ONNX만 이 이미지에 포함할 수 있다.
 
 ## 파이프라인 개요
 
@@ -12,13 +14,14 @@ Voiceprint는 정적 export 웹 앱 + nginx 런타임으로 배포한다. 활성
   ├─ make build         next build → apps/web/out/
   │                       ├─ static pages (/, /about, /analyze, /privacy, /result, /settings)
   │                       ├─ wasm/*.wasm + glue .js
-  │                       ├─ models/voice-4dim-vctk-101-v1.onnx  (활성, 커밋됨)
-  │                       └─ model-manifest.json (activeModel + reportEligible)
+  │                       ├─ models/  (권한 게이트 통과 시에만 ONNX)
+  │                       └─ model-manifest.json (현재 activeModel: null)
   └─ make docker-build  rust:1.96 → node:26 → nginx:1.29-alpine
                           runtime: nginx + /usr/share/nginx/html (정적 자산만)
 ```
 
-WASM 바이너리·JS 글루·out/은 gitignored라 클린 체크아웃에서는 빌드 스크립트가 생성해야 한다. 활성 ONNX는 저장소에 커밋되어 있어 빌드 없이도 serve 가능하다.
+WASM 바이너리·JS 글루·out/·모델 산출물은 gitignored라 클린 체크아웃에서는
+빌드 스크립트가 생성해야 한다. 현재는 활성 ONNX가 없다.
 
 ## 빌드 단계
 
@@ -40,14 +43,16 @@ Next 빌드:
 
 - `next.config.ts`가 `output: "export"`, `trailingSlash: true`, `images.unoptimized`, `typescript.ignoreBuildErrors: true`
 - 산출: `apps/web/out/` 아래 정적 HTML + `_next/` 정적 청크
+- `scripts/prune-export-models.mjs`가 manifest에 없는 ONNX를 `out/models/`에서
+  제거하고, manifest가 가리키는 모델이 빠진 경우 빌드를 실패시킨다. 로컬의
+  과거 실험 artifact가 Docker 이미지에 섞이는 것을 막는 패키징 게이트다.
 - 확인된 라우트 9개: `/`, `/_not-found`, `/about`, `/analyze`, `/privacy`, `/result`, `/settings`
 
 ### 2. 빌드 산출물 점검
 
 ```sh
 ls apps/web/out/
-ls apps/web/out/models/     # voice-4dim-vctk-101-v1.onnx 있어야 함 (활성)
-cat apps/web/out/model-manifest.json | jq .activeModel   # "voice-4dim-vctk-101-v1"
+cat apps/web/out/model-manifest.json | jq .activeModel   # null
 ```
 
 ### 3. Docker 이미지 (`make docker-build`)
@@ -69,7 +74,8 @@ make docker-run     # docker run --rm -p 8080:8080 voiceprint:local
 런타임 이미지 구성:
 
 - nginx + 정적 자산
-- 없는 것: Node.js, Python, Rust 컴파일러, 학습 데이터, Kaggle credential, PyTorch 체크포인트, ONNX 학습 산출물 중 활성 ONNX 외 전부
+- 없는 것: Node.js, Python, Rust 컴파일러, 학습 데이터, Kaggle credential,
+  PyTorch checkpoint, 그리고 권한 미확인 ONNX 산출물
 
 ### 4. nginx 구성(`Dockerfile` 내`nginx.conf`)
 
@@ -126,12 +132,14 @@ make docker-run     # docker run --rm -p 8080:8080 voiceprint:local
    - `evaluation.calibrationEce` 수치(regression ECE)
    - `onnx.maxAbsoluteError` 수치
    - `modelCard` 비어있지 않은 문자열
+   - `rights.annotationLicenseVerified`, `trainingAllowed`,
+     `modelDistributionAllowed`, `publicServiceAllowed` 모두 `true`이며
+     해당 근거를 evidence에 기록
 4. ONNX export → `apps/web/public/models/<id>.onnx` 배치.
 5. `create_manifest --report-eligible --report-evidence <json>` 실행.
 6. `verify_manifest` PASS 확인.
-7. `.gitignore` 네거션 라인 추가: `!apps/web/public/models/<id>.onnx`. 낡은 활성 모델 예외 라인 제거.
-8. `make build` 재실행 → `apps/web/out/models/`에 새 ONNX 반영.
-9. 정적 export + 커밋 + 푸시.
+7. `make build` 재실행 → `apps/web/out/models/`에 새 ONNX 반영.
+8. 정적 export + 커밋 + 푸시.
 
 게이트 검증 코드: `ml/voiceprint_ml/verify_manifest.py`. report-evidence 필드 검증: `ml/voiceprint_ml/create_manifest.py:report_evidence_digest`. 활성 모델은 항상 `reportEligible: true`여야 한다(`verify_manifest`가 강제).
 
@@ -150,18 +158,20 @@ nginx 외 임의 정적 호스트(Vercel static, GitHub Pages, Cloudflare Pages,
 
 ## 릴리스 상태
 
-`docs/project-status.md`의 `REPORT_MODEL_ACTIVE`. 활성 모델은 `voice-4dim-vctk-101-v1`, report-eligibility 게이트 통과, manifest에 SHA-256 연쇄 기록. 낡은 TIS 학습 경로는 레거시 코퍼스 경로로 `docs/training.md`에 보존하고 활성 manifest에서는 사용하지 않는다.
+`docs/project-status.md`의 `DATA_REASSESSMENT_REQUIRED`. 현재 활성 모델은
+없으며, 권한이 검증된 새 데이터와 evidence가 확보될 때까지 결정론적 보고서만
+제공한다.
 
 ## 검증 산출물 체크리스트
 
 배포 전 아래를 모두 확인한다.
 
-- [ ] `apps/web/out/model-manifest.json`의 `activeModel`이 의도한 모델 ID
-- [ ] `apps/web/out/models/<activeModel>.onnx` 존재 + SHA-256이 manifest 기록과 일치
+- [ ] `apps/web/out/model-manifest.json`의 `activeModel`이 의도한 상태인지 확인
+- [ ] 활성 모델이 있는 경우에만 ONNX 존재·SHA-256·releaseRights를 함께 확인
 - [ ] `apps/web/out/wasm/voice_dsp_bg.wasm` + `apps/web/out/wasm/voice_dsp.js` 존재
 - [ ] 정적 라우트 9개 디렉토리 각 `index.html` 존재
 - [ ] `make test-e2e` PASS → POST/PUT/PATCH 0건 + 외부 origin 요청 0건
-- [ ] `verify_manifest` PASS → `{models:1, active:1}`
-- [ ] `validate_onnx` PASS → max abs err < 1e-4
+- [ ] `verify_manifest` PASS → 현재 `{models:0, active:0}`
+- [ ] 활성 모델이 있는 경우에만 `validate_onnx` PASS → max abs err < 1e-4
 - [ ] Docker 빌드 성공 → `voiceprint:local` 이미지
 - [ ] `docker run` 후 `http://localhost:8080`에서 `/analyze` 진입 + 마이크 권한 프롬프트 + 결과 렌더

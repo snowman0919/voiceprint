@@ -17,7 +17,6 @@ kaggle.json
 apps/web/public/wasm/
 apps/web/public/ort/
 apps/web/public/models/*
-!apps/web/public/models/voice-4dim-vctk-101-v1.onnx
 apps/web/src/generated/
 ml/checkpoints/
 .opencode/

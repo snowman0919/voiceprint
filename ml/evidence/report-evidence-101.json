@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "status": "historical_disabled_permission_required",
   "purpose": "voice-impression-report",
   "modelId": "voice-4dim-vctk-101-v1",
   "modelVersion": "1.0.0",
@@ -9,6 +10,13 @@
     "source": "VCTK-RVA (Voice Cloning Toolkit - Respeaker Voice Attributes). Elo ratings from consented multi-rater pair comparisons across train.txt, seen.txt, and unseen.txt comparison pools. Brightness/softness/impression labels derived from gender-normalized Elo scores rescaled to [0,1].",
     "labelDims": ["impression", "brightness", "softness", "stability"],
     "placeholderDims": ["stability (constant 0.5 until a consented multi-rater source is secured)"]
+  },
+  "rights": {
+    "annotationLicenseVerified": false,
+    "trainingAllowed": false,
+    "modelDistributionAllowed": false,
+    "publicServiceAllowed": false,
+    "note": "VCTK-RVA annotation and vTAD code terms are permission_required; this historical record cannot activate a model."
   },
   "evaluation": {
     "heldOutSpeakerCount": 20,
