@@ -436,6 +436,11 @@ button {
 .share-status {
   font-size: 14px;
 }
+.metric-provenance {
+  color: #556070;
+  font-size: 13px;
+  line-height: 1.5;
+}
 @media (max-width: 600px) {
   body {
     padding: 0;

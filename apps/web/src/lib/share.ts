@@ -1,3 +1,10 @@
+export type MetricProvenance =
+  | "direct_acoustic_measurement"
+  | "deterministic_derived_metric"
+  | "human_rated_model"
+  | "pseudo_labeled_model"
+  | "unsupported";
+
 export type SharedResultV1 = {
   schemaVersion: 1;
   appVersion: string;
@@ -21,6 +28,13 @@ export type SharedResultV1 = {
 
 /** Scalar-only extension safe for server persistence. It deliberately excludes recordings and frame arrays. */
 export type StoredResultV1 = SharedResultV1 & {
+  /** Group-level provenance keeps every persisted scalar traceable without storing audio-derived arrays. */
+  provenance?: {
+    summary: MetricProvenance;
+    acoustic: MetricProvenance;
+    quality: MetricProvenance;
+    details: MetricProvenance;
+  };
   details?: {
     sampleRate?: number;
     durationSeconds?: number;

@@ -340,6 +340,12 @@ export function Recorder() {
         snr: value.quality.estimatedSnrDb,
         clippingRatio: value.quality.clippingRatio,
       },
+      provenance: {
+        summary: "deterministic_derived_metric",
+        acoustic: "direct_acoustic_measurement",
+        quality: "deterministic_derived_metric",
+        details: "direct_acoustic_measurement",
+      },
       details: {
         sampleRate: value.input.sampleRate,
         durationSeconds: value.input.durationSeconds,

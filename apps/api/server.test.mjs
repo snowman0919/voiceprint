@@ -13,6 +13,12 @@ const result = {
   dspVersion: "test",
   acoustic: { f0Median: 180, voicedRatio: 0.7 },
   quality: { score: 90, clippingRatio: 0.001 },
+  provenance: {
+    summary: "deterministic_derived_metric",
+    acoustic: "direct_acoustic_measurement",
+    quality: "deterministic_derived_metric",
+    details: "direct_acoustic_measurement",
+  },
 };
 
 test("stores scalar results without accepting recordings and gates retrieval by recovery or share secret", async () => {
@@ -60,6 +66,13 @@ test("stores scalar results without accepting recordings and gates retrieval by 
       body: JSON.stringify({ recoveryId, result: { ...result, recording: "audio-bytes" } }),
     });
     assert.equal(blocked.status, 400);
+
+    const invalidProvenance = await fetch(`${origin}/results`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recoveryId, result: { ...result, provenance: { summary: "not-a-provenance" } } }),
+    });
+    assert.equal(invalidProvenance.status, 400);
 
     const deleted = await fetch(`${origin}/results/delete`, {
       method: "POST",

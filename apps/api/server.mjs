@@ -9,6 +9,13 @@ const isRecord = (value) => typeof value === "object" && value !== null && !Arra
 const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
 const opaqueValue = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{32,128}$/.test(value);
 const onlyKeys = (value, allowed) => Object.keys(value).every((key) => allowed.includes(key));
+const metricProvenance = new Set([
+  "direct_acoustic_measurement",
+  "deterministic_derived_metric",
+  "human_rated_model",
+  "pseudo_labeled_model",
+  "unsupported",
+]);
 
 function validResult(value) {
   if (!isRecord(value) || value.schemaVersion !== 1) return false;
@@ -23,6 +30,7 @@ function validResult(value) {
       "acoustic",
       "quality",
       "details",
+      "provenance",
     ])
   )
     return false;
@@ -54,6 +62,14 @@ function validResult(value) {
     )
       return false;
   }
+  if (
+    value.provenance !== undefined &&
+    (!isRecord(value.provenance) ||
+      !onlyKeys(value.provenance, ["summary", "acoustic", "quality", "details"]) ||
+      Object.keys(value.provenance).length !== 4 ||
+      !Object.values(value.provenance).every((item) => metricProvenance.has(item)))
+  )
+    return false;
   if (
     value.details !== undefined &&
     (!isRecord(value.details) ||

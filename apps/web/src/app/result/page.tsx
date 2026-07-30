@@ -14,6 +14,14 @@ import {
   type LoadedResult,
 } from "@/lib/result-store";
 
+const provenanceLabel = {
+  direct_acoustic_measurement: "직접 음향 측정",
+  deterministic_derived_metric: "측정값 기반 계산",
+  human_rated_model: "사람 평가 기반 모델",
+  pseudo_labeled_model: "pseudo-label 모델",
+  unsupported: "지원되지 않음",
+} as const;
+
 export default function ResultPage() {
   const [result, setResult] = useState<StoredResultV1>();
   const [error, setError] = useState<string>();
@@ -133,10 +141,19 @@ export default function ResultPage() {
           <dd>{result.quality.score}</dd>
         </div>
       </dl>
+      {result.provenance && (
+        <p className="metric-provenance">
+          인상 요약: {provenanceLabel[result.provenance.summary]} · 음향 수치: {provenanceLabel[result.provenance.acoustic]}
+          · 입력 품질: {provenanceLabel[result.provenance.quality]}
+        </p>
+      )}
       {result.details && (
         <section className="result-details" aria-labelledby="details-heading">
           <h2 id="details-heading">상세 음향 분석</h2>
-          <p>이 수치는 녹음에서 관측한 음향 특징이며 사람의 성격·건강·정체성을 판단하지 않습니다.</p>
+          <p>
+            이 수치는 녹음에서 관측한 음향 특징이며 사람의 성격·건강·정체성을 판단하지 않습니다.
+            {result.provenance && ` 출처: ${provenanceLabel[result.provenance.details]}.`}
+          </p>
           <dl className="quality">
             {result.details.durationSeconds !== undefined && (
               <div>
