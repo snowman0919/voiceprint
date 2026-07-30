@@ -17,6 +17,7 @@ kaggle.json
 apps/web/public/wasm/
 apps/web/public/ort/
 apps/web/public/models/*
+!apps/web/public/models/tis-intent-v1.onnx
 apps/web/src/generated/
 ml/checkpoints/
 .opencode/

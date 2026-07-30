@@ -1,5 +1,19 @@
 {
   "schemaVersion": 1,
   "activeModel": null,
-  "models": []
+  "models": [
+    {
+      "id": "tis-intent-v1",
+      "version": "1.0.0",
+      "url": "/models/tis-intent-v1.onnx",
+      "size": 658960,
+      "sha256": "862db486fe70227ca4ea5b924e54ad0ddef8234171c52f118e333307c0794eb3",
+      "inputSampleRate": 16000,
+      "inputSeconds": 4,
+      "opset": 18,
+      "quantization": "none",
+      "minimumAppVersion": "0.1.0",
+      "reportEligible": false
+    }
+  ]
 }
