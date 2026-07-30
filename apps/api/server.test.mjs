@@ -45,6 +45,15 @@ test("stores scalar results without accepting recordings and gates retrieval by 
     });
     assert.deepEqual((await shared.json()).result, result);
 
+    const listed = await fetch(`${origin}/results/list`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recoveryId }),
+    });
+    const listedBody = await listed.json();
+    assert.equal(listedBody.results.length, 1);
+    assert.equal(listedBody.results[0].id, saved.id);
+
     const blocked = await fetch(`${origin}/results`, {
       method: "POST",
       headers: { "content-type": "application/json" },

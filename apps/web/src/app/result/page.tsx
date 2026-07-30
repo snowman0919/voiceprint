@@ -5,7 +5,14 @@ import { useEffect, useState } from "react";
 import type { StoredResultV1 } from "@/lib/share";
 import { brand } from "@/lib/brand";
 import { reviewDemoResult } from "@/lib/review-demo";
-import { deleteStoredResult, loadLatestResult, loadSharedResult } from "@/lib/result-store";
+import {
+  deleteStoredResult,
+  listStoredResults,
+  loadLatestResult,
+  loadSharedResult,
+  loadStoredResult,
+  type LoadedResult,
+} from "@/lib/result-store";
 
 export default function ResultPage() {
   const [result, setResult] = useState<StoredResultV1>();
@@ -13,9 +20,20 @@ export default function ResultPage() {
   const [isReviewDemo, setIsReviewDemo] = useState(false);
   const [resultId, setResultId] = useState<string>();
   const [isShared, setIsShared] = useState(false);
+  const [savedResults, setSavedResults] = useState<LoadedResult[]>([]);
+  const [fragment, setFragment] = useState("");
   useEffect(() => {
-    const shareToken = new URLSearchParams(window.location.hash.slice(1)).get("share");
-    void (shareToken ? loadSharedResult(shareToken) : loadLatestResult())
+    const updateFragment = () => setFragment(window.location.hash.slice(1));
+    updateFragment();
+    window.addEventListener("hashchange", updateFragment);
+    return () => window.removeEventListener("hashchange", updateFragment);
+  }, []);
+  useEffect(() => {
+    const parameters = new URLSearchParams(fragment);
+    const shareToken = parameters.get("share");
+    const storedId = parameters.get("result");
+    setError(undefined);
+    void (shareToken ? loadSharedResult(shareToken) : storedId ? loadStoredResult(storedId) : loadLatestResult())
       .then((loaded) => {
         setResult(loaded.result);
         setResultId(loaded.id);
@@ -30,7 +48,11 @@ export default function ResultPage() {
         }
         setError(reason.message);
       });
-  }, []);
+    if (!shareToken)
+      void listStoredResults()
+        .then(({ results }) => setSavedResults(results))
+        .catch(() => setSavedResults([]));
+  }, [fragment]);
   if (error)
     return (
       <main className="document">
@@ -55,6 +77,7 @@ export default function ResultPage() {
     setResult(reviewDemoResult);
     setResultId(undefined);
     setIsReviewDemo(true);
+    setSavedResults((items) => items.filter((item) => item.id !== resultId));
   }
   return (
     <main className="document">
@@ -177,6 +200,21 @@ export default function ResultPage() {
         <button className="secondary-action" onClick={() => void removeResult()} type="button">
           이 저장 결과 삭제
         </button>
+      )}
+      {!isShared && savedResults.length > 1 && (
+        <section className="saved-history" aria-labelledby="history-heading">
+          <h2 id="history-heading">이 브라우저의 최근 결과</h2>
+          <ul>
+            {savedResults.map((item) => (
+              <li key={item.id}>
+                <a href={`#result=${item.id}`}>
+                  {new Date(item.createdAt).toLocaleDateString("ko-KR")} · F0{" "}
+                  {Math.round(item.result.acoustic.f0Median ?? 0)}Hz · 품질 {item.result.quality.score}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {isReviewDemo && (
         <Link className="primary-link" href="/analyze">

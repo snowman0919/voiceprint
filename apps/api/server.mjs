@@ -147,6 +147,9 @@ export function createResultsServer({ dbPath }) {
   const resultForShare = db.prepare(
     "SELECT id, created_at, result_json FROM analysis_results WHERE share_token = ? LIMIT 1",
   );
+  const listForRecovery = db.prepare(
+    "SELECT id, created_at, result_json FROM analysis_results WHERE recovery_id = ? ORDER BY created_at DESC LIMIT 20",
+  );
   const deleteForRecovery = db.prepare("DELETE FROM analysis_results WHERE recovery_id = ? AND id = ?");
 
   const server = createServer(async (request, response) => {
@@ -173,6 +176,10 @@ export function createResultsServer({ dbPath }) {
             ? resultForRecovery.get(body.recoveryId, body.resultId)
             : latestForRecovery.get(body.recoveryId);
         return row ? send(response, 200, rowToResponse(row)) : send(response, 404, { error: "not-found" });
+      }
+      if (request.url === "/results/list") {
+        if (!opaqueValue(body.recoveryId)) return send(response, 400, { error: "invalid-recovery-id" });
+        return send(response, 200, { results: listForRecovery.all(body.recoveryId).map(rowToResponse) });
       }
       if (request.url === "/results/share") {
         if (!opaqueValue(body.shareToken)) return send(response, 400, { error: "invalid-share-token" });

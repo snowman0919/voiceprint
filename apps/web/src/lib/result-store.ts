@@ -39,6 +39,14 @@ export function loadLatestResult() {
   return request<LoadedResult>("/api/results/lookup", { recoveryId: recoveryId() });
 }
 
+export function loadStoredResult(resultId: string) {
+  return request<LoadedResult>("/api/results/lookup", { recoveryId: recoveryId(), resultId });
+}
+
+export function listStoredResults() {
+  return request<{ results: LoadedResult[] }>("/api/results/list", { recoveryId: recoveryId() });
+}
+
 export function loadSharedResult(shareToken: string) {
   return request<LoadedResult>("/api/results/share", { shareToken });
 }

@@ -362,6 +362,28 @@ button {
   display: grid;
   gap: 16px;
 }
+.saved-history {
+  display: grid;
+  gap: 10px;
+}
+.saved-history ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.saved-history a {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid #d9e0e8;
+  border-radius: var(--radius-md);
+  color: #14213d;
+  font-weight: 700;
+  text-decoration: none;
+}
+.saved-history a:hover {
+  background: #f3f8f8;
+}
 .result h3 {
   font-size: 18px;
 }
