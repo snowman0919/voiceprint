@@ -136,6 +136,12 @@ export default function ResultPage() {
             <dd>{result.acoustic.f0Median}Hz</dd>
           </div>
         )}
+        {result.acoustic.f1Median !== undefined && (
+          <div>
+            <dt>F1/F2/F3 중앙값</dt>
+            <dd>{Math.round(result.acoustic.f1Median)} / {Math.round(result.acoustic.f2Median ?? 0)} / {Math.round(result.acoustic.f3Median ?? 0)}Hz</dd>
+          </div>
+        )}
         <div>
           <dt>입력 품질</dt>
           <dd>{result.quality.score}</dd>
@@ -177,6 +183,24 @@ export default function ResultPage() {
               <div>
                 <dt>음높이 안정성</dt>
                 <dd>{Math.round(result.details.f0Stability)}/100</dd>
+              </div>
+            )}
+            {result.details.formantSpacing !== undefined && (
+              <div>
+                <dt>포먼트 간격</dt>
+                <dd>{Math.round(result.details.formantSpacing)}Hz</dd>
+              </div>
+            )}
+            {result.details.estimatedVocalTractLength !== undefined && (
+              <div>
+                <dt>추정 성도 길이</dt>
+                <dd>{result.details.estimatedVocalTractLength.toFixed(1)}cm</dd>
+              </div>
+            )}
+            {result.details.formantFrameSuccessRatio !== undefined && (
+              <div>
+                <dt>포먼트 추적 성공률</dt>
+                <dd>{Math.round(result.details.formantFrameSuccessRatio * 100)}%</dd>
               </div>
             )}
             {result.details.spectralCentroid !== undefined && (

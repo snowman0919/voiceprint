@@ -55,6 +55,9 @@ export type StoredResultV1 = SharedResultV1 & {
     volumeVariation?: number;
     zeroCrossingRate?: number;
     estimatedSnr?: number;
+    formantSpacing?: number;
+    estimatedVocalTractLength?: number;
+    formantFrameSuccessRatio?: number;
   };
 };
 

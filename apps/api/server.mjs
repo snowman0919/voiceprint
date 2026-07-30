@@ -93,6 +93,9 @@ function validResult(value) {
         "volumeVariation",
         "zeroCrossingRate",
         "estimatedSnr",
+        "formantSpacing",
+        "estimatedVocalTractLength",
+        "formantFrameSuccessRatio",
       ]) ||
       !Object.values(value.details).every((item) => item === undefined || isFiniteNumber(item)))
   )

@@ -1,6 +1,6 @@
 import { inspectAudio } from "@/lib/audio-quality";
 import { analysisConfig } from "@/lib/analysis-config";
-import { summarizeF0, type DspSummary, type Spectrogram } from "@/lib/dsp";
+import { summarizeF0, summarizeFormants, type DspSummary, type FormantTriplet, type Spectrogram } from "@/lib/dsp";
 import { peakEnvelope } from "@/lib/waveform";
 
 type Request = { pcm: ArrayBuffer; sampleRate: number; droppedFrames?: boolean };
@@ -19,13 +19,25 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   const frameCount = Math.min(analysisConfig.maxSummaryFrames, Math.floor(analysisPcm.length / frameSize));
   const f0: number[] = [];
   const hnr: number[] = [];
+  const formants: FormantTriplet[] = [];
   stage("pitch");
   for (let frame = 0; frame < frameCount; frame += 1) {
     const offset = Math.floor((analysisPcm.length - frameSize) * (frameCount === 1 ? 0 : frame / (frameCount - 1)));
-    const value = wasm.estimate_f0_hz(analysisPcm.subarray(offset, offset + frameSize), analysisSampleRate);
+    const frameSamples = analysisPcm.subarray(offset, offset + frameSize);
+    const value = wasm.estimate_f0_hz(frameSamples, analysisSampleRate);
     if (Number.isFinite(value)) f0.push(value);
-    const hnrValue = wasm.hnr_db(analysisPcm.subarray(offset, offset + frameSize), analysisSampleRate);
+    const hnrValue = wasm.hnr_db(frameSamples, analysisSampleRate);
     if (Number.isFinite(hnrValue)) hnr.push(hnrValue);
+    const candidate = wasm.estimate_formants_wasm(frameSamples, analysisSampleRate);
+    if (
+      candidate.length === 3 &&
+      Number.isFinite(candidate[0]) &&
+      Number.isFinite(candidate[1]) &&
+      Number.isFinite(candidate[2]) &&
+      candidate[0] < candidate[1] &&
+      candidate[1] < candidate[2]
+    )
+      formants.push([candidate[0], candidate[1], candidate[2]]);
   }
   stage("timbre");
   const spectrogramFrameSize = Math.round(analysisSampleRate * analysisConfig.spectrogramFrameSeconds);
@@ -87,6 +99,7 @@ async function analyzeDsp(pcm: Float32Array, sampleRate: number): Promise<DspSum
   }
   return {
     ...summarizeF0(f0),
+    ...summarizeFormants(formants, frameCount),
     spectralCentroidHz: Number.isFinite(centroid) ? centroid : undefined,
     spectralBandwidthHz: Number.isFinite(bandwidth) ? bandwidth : undefined,
     spectralRolloff85Hz: Number.isFinite(rolloff85) ? rolloff85 : undefined,

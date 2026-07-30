@@ -332,6 +332,9 @@ export function Recorder() {
         f0Median: value.acousticFeatures.f0MedianHz,
         f0P05: value.acousticFeatures.f0P05Hz,
         f0P95: value.acousticFeatures.f0P95Hz,
+        f1Median: value.acousticFeatures.f1MedianHz,
+        f2Median: value.acousticFeatures.f2MedianHz,
+        f3Median: value.acousticFeatures.f3MedianHz,
         hnr: value.acousticFeatures.hnrDb,
         voicedRatio: value.quality.voicedRatio,
       },
@@ -366,6 +369,9 @@ export function Recorder() {
         volumeVariation: value.quality.volumeVariation,
         zeroCrossingRate: value.quality.zeroCrossingRateHz,
         estimatedSnr: value.quality.estimatedSnrDb,
+        formantSpacing: value.acousticFeatures.formantSpacingHz,
+        estimatedVocalTractLength: value.acousticFeatures.estimatedVocalTractLengthCm,
+        formantFrameSuccessRatio: value.acousticFeatures.formantFrameSuccessRatio,
       },
     };
   }
@@ -527,6 +533,12 @@ export function Recorder() {
               <div>
                 <dt>HNR</dt>
                 <dd>{dsp.hnrDb.toFixed(1)}dB</dd>
+              </div>
+            )}
+            {dsp?.f1MedianHz !== undefined && (
+              <div>
+                <dt>F1/F2/F3 중앙값</dt>
+                <dd>{Math.round(dsp.f1MedianHz)} / {Math.round(dsp.f2MedianHz ?? 0)} / {Math.round(dsp.f3MedianHz ?? 0)}Hz</dd>
               </div>
             )}
           </dl>

@@ -13,6 +13,7 @@ const result = {
   dspVersion: "test",
   acoustic: { f0Median: 180, voicedRatio: 0.7 },
   quality: { score: 90, clippingRatio: 0.001 },
+  details: { formantSpacing: 950, estimatedVocalTractLength: 18.4, formantFrameSuccessRatio: 0.6 },
   provenance: {
     summary: "deterministic_derived_metric",
     acoustic: "direct_acoustic_measurement",
