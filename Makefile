@@ -1,4 +1,4 @@
-.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python data-kaggle data-tis data-palette data-audit data-tis-audit data-palette-audit features split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-model-manifest validate-formants benchmark-rtx3080 sync-model sync-tis-model docker-build docker-run deploy verify build
+.PHONY: setup dev build-wasm test-wasm benchmark-dsp benchmark-dsp-compile benchmark lint typecheck test test-web test-e2e test-python test-api data-kaggle data-tis data-palette data-audit data-tis-audit data-palette-audit features split split-tis train train-tis train-baseline evaluate-tis evaluate export-onnx export-tis-onnx model-manifest model-manifest-tis validate-onnx validate-tis-onnx validate-model-manifest validate-formants benchmark-rtx3080 sync-model sync-tis-model docker-build docker-run deploy verify build
 
 setup:
 	pnpm install --frozen-lockfile
@@ -31,10 +31,13 @@ typecheck: build-wasm
 test-web:
 	pnpm --filter web test
 
+test-api:
+	node --test apps/api/server.test.mjs
+
 test-e2e:
 	pnpm --dir apps/web test:e2e
 
-test: test-wasm test-python test-web test-e2e
+test: test-wasm test-python test-web test-api test-e2e
 
 test-python:
 	PYTHONPATH=ml uv run --project ml python -m unittest discover -s ml/tests
@@ -117,8 +120,8 @@ docker-run:
 
 deploy:
 	git pull --ff-only origin main
-	docker compose up --detach --build --remove-orphans voiceprint
-	docker compose ps voiceprint
+	docker compose up --detach --build --remove-orphans
+	docker compose ps
 
 verify: lint typecheck test validate-model-manifest docker-build
 

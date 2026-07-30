@@ -1,6 +1,6 @@
 # Voiceprint
 
-브라우저 안에서 녹음하거나 로컬 음성 파일의 음향 특징을 측정하고, 동의 기반 다중 청취자 평가 corpus로 학습한 ONNX 모델로 음성 인상을 추정하는 정적 웹 앱. 원본 음성·PCM·파형·특징·임베딩·분석 결과를 서버로 전송하지 않는다. 모든 처리는 클라이언트 메모리에서 끝난다.
+브라우저 안에서 녹음하거나 로컬 음성 파일의 음향 특징을 측정하는 웹 앱. 원본 음성·PCM·파형·궤적·임베딩은 서버로 전송하지 않으며, 개인용 결과 서비스 사용 시에는 결과 요약과 스칼라 음향 수치만 SQLite에 저장한다.
 
 ## 상태
 
@@ -25,7 +25,7 @@
 
 - 녹음·분석 중 POST/PUT/PATCH 요청 0건 (Playwright E2E로 강제)
 - 분석 중 외부 origin 요청 0건
-- 결과 공유는 URL fragment `#r=...`로만. query param 사용 안 함. fragment payload는 원본 오디오·PCM·임베딩·프레임 배열·마이크 기기명·파일 경로·브라우저 지문 제외
+- 결과 공유는 URL fragment `#share=...`로만. query param 사용 안 함. fragment에는 공유 비밀 토큰만 두고 결과는 SQLite에서 조회하며, 원본 오디오·PCM·임베딩·프레임 배열·마이크 기기명·파일 경로·브라우저 지문은 제외
 - nginx: CSP · COOP · COEP · Permissions-Policy(`microphone=self`) · X-Content-Type-Options · Referrer-Policy
 - Service Worker: 정적 에셋만 캐싱, 모델·manifest 제외
 

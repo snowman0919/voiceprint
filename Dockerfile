@@ -22,3 +22,9 @@ FROM nginx:1.29-alpine AS runtime
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=web-build /workspace/apps/web/out /usr/share/nginx/html
 EXPOSE 8080
+
+FROM node:26-bookworm-slim AS api-runtime
+WORKDIR /app
+COPY apps/api/server.mjs ./server.mjs
+EXPOSE 8081
+CMD ["node", "server.mjs"]

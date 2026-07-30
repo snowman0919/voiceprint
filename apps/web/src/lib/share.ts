@@ -19,6 +19,31 @@ export type SharedResultV1 = {
   quality: { score: number; snr?: number; clippingRatio: number };
 };
 
+/** Scalar-only extension safe for server persistence. It deliberately excludes recordings and frame arrays. */
+export type StoredResultV1 = SharedResultV1 & {
+  details?: {
+    sampleRate?: number;
+    durationSeconds?: number;
+    effectiveVoiceSeconds?: number;
+    f0Mean?: number;
+    f0Stability?: number;
+    f0SemitoneRange?: number;
+    spectralCentroid?: number;
+    spectralBandwidth?: number;
+    spectralRolloff85?: number;
+    spectralFlatness?: number;
+    spectralSlope?: number;
+    spectralFlux?: number;
+    lowBandEnergyRatio?: number;
+    midBandEnergyRatio?: number;
+    highBandEnergyRatio?: number;
+    pauseRatio?: number;
+    volumeVariation?: number;
+    zeroCrossingRate?: number;
+    estimatedSnr?: number;
+  };
+};
+
 const MAX_FRAGMENT_LENGTH = 8_192;
 const number = (value: number) => Math.round(value * 10) / 10;
 

@@ -2,27 +2,34 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { decodeSharedResult, type SharedResultV1 } from "@/lib/share";
+import type { StoredResultV1 } from "@/lib/share";
 import { brand } from "@/lib/brand";
 import { reviewDemoResult } from "@/lib/review-demo";
+import { deleteStoredResult, loadLatestResult, loadSharedResult } from "@/lib/result-store";
 
 export default function ResultPage() {
-  const [result, setResult] = useState<SharedResultV1>();
+  const [result, setResult] = useState<StoredResultV1>();
   const [error, setError] = useState<string>();
   const [isReviewDemo, setIsReviewDemo] = useState(false);
+  const [resultId, setResultId] = useState<string>();
+  const [isShared, setIsShared] = useState(false);
   useEffect(() => {
-    const payload = new URLSearchParams(window.location.hash.slice(1)).get("r") ?? "";
-    if (!payload) {
-      setResult(reviewDemoResult);
-      setIsReviewDemo(true);
-      return;
-    }
-    void decodeSharedResult(payload)
-      .then((decoded) => {
-        setResult(decoded);
+    const shareToken = new URLSearchParams(window.location.hash.slice(1)).get("share");
+    void (shareToken ? loadSharedResult(shareToken) : loadLatestResult())
+      .then((loaded) => {
+        setResult(loaded.result);
+        setResultId(loaded.id);
+        setIsShared(Boolean(shareToken));
         setIsReviewDemo(false);
       })
-      .catch((reason: Error) => setError(reason.message));
+      .catch((reason: Error) => {
+        if (!shareToken && reason.message === "저장된 결과를 찾을 수 없습니다.") {
+          setResult(reviewDemoResult);
+          setIsReviewDemo(true);
+          return;
+        }
+        setError(reason.message);
+      });
   }, []);
   if (error)
     return (
@@ -38,20 +45,38 @@ export default function ResultPage() {
         <p role="status">공유 결과를 읽는 중…</p>
       </main>
     );
+  const masculinity = result.summary?.masculinity ?? 50;
+  const femininity = result.summary?.femininity ?? 50;
+  const leadingImpression =
+    masculinity === femininity ? "균형적인" : masculinity > femininity ? "낮고 안정적인" : "가볍고 밝은";
+  async function removeResult() {
+    if (!resultId) return;
+    await deleteStoredResult(resultId);
+    setResult(reviewDemoResult);
+    setResultId(undefined);
+    setIsReviewDemo(true);
+  }
   return (
     <main className="document">
       <Link href="/">{brand.name}</Link>
-      <p className="eyebrow">{isReviewDemo ? "검토용 예시" : "공유된 요약"}</p>
-      <h1>{isReviewDemo ? "결과 화면 미리보기" : "음향적 경향"}</h1>
+      <p className="eyebrow">{isReviewDemo ? "검토용 예시" : "저장된 측정 결과"}</p>
+      <section className="impression-hero" aria-labelledby="impression-heading">
+        <p>오락용 음성 인상</p>
+        <h1 id="impression-heading">이 녹음은 {leadingImpression} 인상에 조금 더 가깝습니다.</h1>
+        <div className="impression-scale" aria-label={`남성성 ${masculinity}%, 여성성 ${femininity}%`}>
+          <span>남성성 {masculinity}%</span>
+          <meter max="100" min="0" value={masculinity} />
+          <span>여성성 {femininity}%</span>
+        </div>
+        <p className="impression-disclaimer">
+          음성 특징 기반의 오락용 인상 지표입니다. 성별·성 정체성·성격을 판정하지 않으며, 녹음 조건과 발화 상황에 따라
+          달라질 수 있습니다.
+        </p>
+      </section>
       <p>
         {isReviewDemo
           ? "이 화면은 레이아웃을 검토하기 위한 합성 수치 예시입니다. 학습 데이터와 실제 음성은 사용하지 않습니다."
-          : "이 결과는 공유 링크에 포함된 측정 요약입니다. 원본 음성은 포함되어 있지 않습니다."}
-      </p>
-      <p className="safety">
-        음성 특징 기반의 오락용 인상 지표입니다. 성별·성 정체성·성격을 판정하지 않으며, 녹음 조건과 발화 상황에 따라
-        달라질 수 있습니다. ‘남성성’과 ‘여성성’은 우열이나 고정된 기준이 아닌 연속적인 표현 경향을 설명하기 위한 친숙한
-        표현입니다.
+          : "서버에는 상세 측정값 중 스칼라 수치만 저장합니다. 원본 음성·PCM·파형·프레임별 배열은 포함하지 않습니다."}
       </p>
       <dl className="quality">
         {result.summary && (
@@ -85,7 +110,74 @@ export default function ResultPage() {
           <dd>{result.quality.score}</dd>
         </div>
       </dl>
-      <p>공유 결과는 링크 작성자가 수정할 수 있으며 공식 인증 결과가 아닙니다.</p>
+      {result.details && (
+        <section className="result-details" aria-labelledby="details-heading">
+          <h2 id="details-heading">상세 음향 분석</h2>
+          <p>이 수치는 녹음에서 관측한 음향 특징이며 사람의 성격·건강·정체성을 판단하지 않습니다.</p>
+          <dl className="quality">
+            {result.details.durationSeconds !== undefined && (
+              <div>
+                <dt>분석 길이</dt>
+                <dd>{result.details.durationSeconds.toFixed(1)}초</dd>
+              </div>
+            )}
+            {result.details.f0Mean !== undefined && (
+              <div>
+                <dt>F0 평균</dt>
+                <dd>{Math.round(result.details.f0Mean)}Hz</dd>
+              </div>
+            )}
+            {result.details.f0SemitoneRange !== undefined && (
+              <div>
+                <dt>F0 범위</dt>
+                <dd>{result.details.f0SemitoneRange.toFixed(1)}st</dd>
+              </div>
+            )}
+            {result.details.f0Stability !== undefined && (
+              <div>
+                <dt>음높이 안정성</dt>
+                <dd>{Math.round(result.details.f0Stability)}/100</dd>
+              </div>
+            )}
+            {result.details.spectralCentroid !== undefined && (
+              <div>
+                <dt>스펙트럼 중심</dt>
+                <dd>{Math.round(result.details.spectralCentroid)}Hz</dd>
+              </div>
+            )}
+            {result.details.spectralBandwidth !== undefined && (
+              <div>
+                <dt>스펙트럼 대역폭</dt>
+                <dd>{Math.round(result.details.spectralBandwidth)}Hz</dd>
+              </div>
+            )}
+            {result.details.spectralFlatness !== undefined && (
+              <div>
+                <dt>스펙트럼 평탄도</dt>
+                <dd>{result.details.spectralFlatness.toFixed(3)}</dd>
+              </div>
+            )}
+            {result.details.pauseRatio !== undefined && (
+              <div>
+                <dt>휴지 비율</dt>
+                <dd>{Math.round(result.details.pauseRatio * 100)}%</dd>
+              </div>
+            )}
+            {result.details.estimatedSnr !== undefined && (
+              <div>
+                <dt>추정 SNR</dt>
+                <dd>{result.details.estimatedSnr.toFixed(1)}dB</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      )}
+      <p>공유 링크는 비밀 토큰으로 조회합니다. 공식 인증 결과가 아니며, 원본 음성은 저장하지 않습니다.</p>
+      {!isReviewDemo && !isShared && resultId && (
+        <button className="secondary-action" onClick={() => void removeResult()} type="button">
+          이 저장 결과 삭제
+        </button>
+      )}
       {isReviewDemo && (
         <Link className="primary-link" href="/analyze">
           내 목소리로 측정하기

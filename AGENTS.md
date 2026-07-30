@@ -1,6 +1,6 @@
 # Voiceprint — AGENTS.md
 
-기기 내장 음성 인상 분석기. 모든 오디오는 브라우저 안에서 처리. 한국어 주 UI.
+기기 내장 음성 인상 분석기. 모든 오디오는 브라우저 안에서 처리하며, 개인용 결과 서비스는 스칼라 결과만 저장한다. 한국어 주 UI.
 
 ## Quick start
 
@@ -39,7 +39,7 @@ docs/             Architecture, privacy, model/data cards, deployment
 **정적 내보내기** (`make build`):
 
 - `next.config.ts`: `output: "export"`, `trailingSlash: true`, `images: { unoptimized: true }`
-- API Routes, Server Actions, 동적 SSR, 데이터베이스 없음
+- Next.js API Routes, Server Actions, 동적 SSR, 원본 음성 데이터베이스
 
 ## 명령어
 
@@ -68,14 +68,14 @@ docs/             Architecture, privacy, model/data cards, deployment
 3. **React UI** 결과 렌더링 (파형, F0, 스펙트럼 특징, HNR)
 4. **Model Worker** (`workers/model.worker.ts`) → ONNX Runtime Web (WebGPU→WASM fallback)
 
-2-4단계 모두 브라우저 메모리에서 처리 — 네트워크 없음.
+2-4단계의 오디오 처리는 브라우저 메모리에서 처리된다. 개인용 결과 서비스는 분석 완료 후 스칼라 결과만 같은 오리진 SQLite API로 저장한다.
 
 ## 프라이버시 불변 규칙 (E2E로 강제)
 
-- 녹음/분석 중 POST/PUT/PATCH 요청 0건
+- 녹음/분석 중 원본 음성·PCM·프레임 배열을 담은 POST/PUT/PATCH 요청 0건
 - 분석 중 외부 오리진 요청 0건
-- 결과 공유는 URL fragment `#r=...`로만 (query param 절대 사용 안 함)
-- Fragment payload 제외: raw audio, PCM, 임베딩, 프레임별 배열, 마이크 기기명, 파일 경로, 브라우저 지문
+- 결과 공유는 URL fragment `#share=...`로만 (query param 절대 사용 안 함)
+- Fragment에는 공유 토큰만 두며, 저장 payload와 공유 결과에서 raw audio, PCM, 임베딩, 프레임별 배열, 마이크 기기명, 파일 경로, 브라우저 지문 제외
 - nginx.conf: CSP, COOP, COEP, Permissions-Policy (microphone=self), X-Content-Type-Options, Referrer-Policy
 - Service Worker (`public/service-worker.js`) — 정적 에셋만 캐싱 (모델은 제외)
 

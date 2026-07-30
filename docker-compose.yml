@@ -1,9 +1,40 @@
 services:
   voiceprint:
-    build: .
+    build:
+      context: .
+      target: runtime
     ports:
       - "8088:8080"
+    depends_on:
+      results-api:
+        condition: service_healthy
     read_only: true
     tmpfs:
       - /var/cache/nginx
       - /var/run
+
+  results-api:
+    build:
+      context: .
+      target: api-runtime
+    environment:
+      RESULTS_DB_PATH: /data/results.sqlite
+    volumes:
+      - result-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  result-data:

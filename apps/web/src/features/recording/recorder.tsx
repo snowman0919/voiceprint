@@ -7,7 +7,8 @@ import { downloadSummaryPng, downloadText } from "@/lib/download";
 import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal } from "@/lib/results";
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
-import { encodeSharedResult } from "@/lib/share";
+import { saveResult, type SavedResult } from "@/lib/result-store";
+import type { StoredResultV1 } from "@/lib/share";
 import { minimumRecordingSeconds, readingScripts } from "@/lib/reading-scripts";
 import { F0Contour } from "./f0-contour";
 import { Spectrogram } from "./spectrogram";
@@ -48,6 +49,7 @@ export function Recorder() {
   const [message, setMessage] = useState<string>();
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>();
   const [analysis, setAnalysis] = useState<LocalAnalysis>();
+  const [savedResult, setSavedResult] = useState<SavedResult>();
   const [shareUrl, setShareUrl] = useState<string>();
   const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>("clarity");
   const [selectedScript, setSelectedScript] = useState(readingScripts[0].id);
@@ -90,6 +92,7 @@ export function Recorder() {
     setState("checking");
     setAnalysisStage("input");
     setAnalysis(undefined);
+    setSavedResult(undefined);
     try {
       const result = await new Promise<{ quality: AudioQuality; dsp?: DspSummary; waveform: number[] }>(
         (resolve, reject) => {
@@ -286,6 +289,7 @@ export function Recorder() {
   async function startAnalysis() {
     if (!input || !quality || !dsp) return;
     setShareUrl(undefined);
+    setSavedResult(undefined);
     setAnalysisStage("model");
     const local = createLocalAnalysis(
       {
@@ -299,38 +303,72 @@ export function Recorder() {
       brand.dspVersion,
       practiceGoal,
     );
-    setAnalysisStage(undefined);
     setAnalysis(local);
+    try {
+      const stored = await saveResult(sharedResult(local));
+      setSavedResult(stored);
+      setMessage("측정 요약을 저장했습니다. 원본 녹음은 전송하거나 보관하지 않습니다.");
+    } catch {
+      setMessage("측정은 완료됐지만 결과 저장에 실패했습니다. 네트워크를 확인한 뒤 다시 시도하세요.");
+    } finally {
+      setAnalysisStage(undefined);
+    }
+  }
+
+  function sharedResult(value: LocalAnalysis): StoredResultV1 {
+    return {
+      schemaVersion: 1,
+      appVersion: value.appVersion,
+      modelVersion: value.modelVersion,
+      dspVersion: value.dspVersion,
+      createdAt: value.createdAt,
+      summary: {
+        masculinity: value.voiceImpression.masculinity,
+        femininity: value.voiceImpression.femininity,
+        brightness: value.acousticSummary.find((tendency) => tendency.label === "밝은 음색")?.score ?? 0,
+        stability: value.acousticSummary.find((tendency) => tendency.label === "음높이 안정성")?.score ?? 0,
+      },
+      acoustic: {
+        f0Median: value.acousticFeatures.f0MedianHz,
+        f0P05: value.acousticFeatures.f0P05Hz,
+        f0P95: value.acousticFeatures.f0P95Hz,
+        hnr: value.acousticFeatures.hnrDb,
+        voicedRatio: value.quality.voicedRatio,
+      },
+      quality: {
+        score: value.quality.score,
+        snr: value.quality.estimatedSnrDb,
+        clippingRatio: value.quality.clippingRatio,
+      },
+      details: {
+        sampleRate: value.input.sampleRate,
+        durationSeconds: value.input.durationSeconds,
+        effectiveVoiceSeconds: value.input.effectiveVoiceSeconds,
+        f0Mean: value.acousticFeatures.f0MeanHz,
+        f0Stability: value.acousticFeatures.f0Stability,
+        f0SemitoneRange: value.acousticFeatures.f0SemitoneRange,
+        spectralCentroid: value.acousticFeatures.spectralCentroidHz,
+        spectralBandwidth: value.acousticFeatures.spectralBandwidthHz,
+        spectralRolloff85: value.acousticFeatures.spectralRolloff85Hz,
+        spectralFlatness: value.acousticFeatures.spectralFlatness,
+        spectralSlope: value.acousticFeatures.spectralSlopeDbPerKhz,
+        spectralFlux: value.acousticFeatures.spectralFlux,
+        lowBandEnergyRatio: value.acousticFeatures.lowBandEnergyRatio,
+        midBandEnergyRatio: value.acousticFeatures.midBandEnergyRatio,
+        highBandEnergyRatio: value.acousticFeatures.highBandEnergyRatio,
+        pauseRatio: value.quality.pauseRatio,
+        volumeVariation: value.quality.volumeVariation,
+        zeroCrossingRate: value.quality.zeroCrossingRateHz,
+        estimatedSnr: value.quality.estimatedSnrDb,
+      },
+    };
   }
 
   async function shareAnalysis() {
     if (!analysis) return;
-    const payload = await encodeSharedResult({
-      schemaVersion: 1,
-      appVersion: analysis.appVersion,
-      modelVersion: analysis.modelVersion,
-      dspVersion: analysis.dspVersion,
-      createdAt: analysis.createdAt,
-      summary: {
-        masculinity: analysis.voiceImpression.masculinity,
-        femininity: analysis.voiceImpression.femininity,
-        brightness: analysis.acousticSummary.find((tendency) => tendency.label === "밝은 음색")?.score ?? 0,
-        stability: analysis.acousticSummary.find((tendency) => tendency.label === "음높이 안정성")?.score ?? 0,
-      },
-      acoustic: {
-        f0Median: analysis.acousticFeatures.f0MedianHz,
-        f0P05: analysis.acousticFeatures.f0P05Hz,
-        f0P95: analysis.acousticFeatures.f0P95Hz,
-        hnr: analysis.acousticFeatures.hnrDb,
-        voicedRatio: analysis.quality.voicedRatio,
-      },
-      quality: {
-        score: analysis.quality.score,
-        snr: analysis.quality.estimatedSnrDb,
-        clippingRatio: analysis.quality.clippingRatio,
-      },
-    });
-    const url = `${window.location.origin}/result/#r=${payload}`;
+    const stored = savedResult ?? (await saveResult(sharedResult(analysis)));
+    setSavedResult(stored);
+    const url = `${window.location.origin}/result/#share=${stored.shareToken}`;
     setShareUrl(url);
     await navigator.clipboard?.writeText(url).catch(() => undefined);
   }

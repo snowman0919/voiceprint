@@ -1,14 +1,16 @@
 # Architecture
 
-Voiceprint is a static Next.js export. Nginx only serves generated files; it has no API routes, database, server session, or audio endpoint.
+Voiceprint is a static Next.js export served by Nginx. A separate same-origin result service is optional for personal use; it has no audio endpoint and persists scalar result records in SQLite.
 
 ```text
 microphone/file -> AudioWorklet or local decoder -> Quality Worker -> Rust/WASM DSP
                                                        |                 |
                                                        +-> UI <- ONNX Runtime Web worker/session
+                                                       |
+                                                       +-> scalar result API -> SQLite (optional)
 ```
 
-Audio samples, PCM, trajectories, embeddings, and analysis results remain in browser memory. A user-selected model is fetched as a static asset, SHA-256 checked, then stored in Cache Storage. The result share payload is compressed into the URL fragment, which HTTP requests do not send to the static host.
+Audio samples, PCM, trajectories, and embeddings remain in browser memory and are discarded after analysis. A user-selected model is fetched as a static asset, SHA-256 checked, then stored in Cache Storage. When the optional personal-result service is enabled, only the displayed scalar measurements are persisted; the share secret remains in the URL fragment while the result stays in SQLite.
 
 The source checkout keeps the model manifest empty because generated checkpoints and ONNX files are not committed. `make train-tis` and `make sync-tis-model` exercise the local ONNX pipeline only; the resulting TIS recording-condition model is not a report model and must not be deployed in the user-facing manifest. The app offers local acoustic measurements and deterministic expression rules until a purpose-specific, consented multi-rater model is available.
 
@@ -20,5 +22,6 @@ The source checkout keeps the model manifest empty because generated checkpoints
 | Quality and DSP | Web Worker + Rust/WASM | no persistent audio                |
 | Model           | ONNX Runtime Web       | verified model Cache Storage entry |
 | Downloads       | browser                | only when the user saves a file    |
+| Result service  | Node.js + SQLite       | scalar result for 365 days only    |
 
 WebGPU is attempted first for an installed model; ONNX Runtime Web falls back to WASM. Before inference, the model Worker uses the shared Rust/WASM band-limited resampler to derive the fixed 16 kHz model stream. The UI reports `GPU` or `CPU/WASM`, not a browser error message.

@@ -6,4 +6,10 @@ export const brand = {
   privacyPromise: "음성은 이 기기를 벗어나지 않습니다.",
   appVersion: "0.1.0",
   dspVersion: analysisConfig.version,
+  privacy: {
+    effectiveDate: "2026-08-01",
+    retentionDays: 365,
+    controllerName: "개인용 Voiceprint 운영자",
+    contact: "배포 전 운영자 연락처 입력 필요",
+  },
 } as const;
