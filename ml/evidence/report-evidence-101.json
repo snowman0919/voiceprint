@@ -7,15 +7,8 @@
     "consentedMultiRater": true,
     "speakerCount": 101,
     "source": "VCTK-RVA (Voice Cloning Toolkit - Respeaker Voice Attributes). Elo ratings from consented multi-rater pair comparisons across train.txt, seen.txt, and unseen.txt comparison pools. Brightness/softness/impression labels derived from gender-normalized Elo scores rescaled to [0,1].",
-    "labelDims": [
-      "impression",
-      "brightness",
-      "softness",
-      "stability"
-    ],
-    "placeholderDims": [
-      "stability (constant 0.5 until a consented multi-rater source is secured)"
-    ]
+    "labelDims": ["impression", "brightness", "softness", "stability"],
+    "placeholderDims": ["stability (constant 0.5 until a consented multi-rater source is secured)"]
   },
   "evaluation": {
     "heldOutSpeakerCount": 20,
@@ -27,7 +20,7 @@
       "impression": 0.14648571610450745,
       "brightness": 0.08176937699317932,
       "softness": 0.13037942349910736,
-      "stability": 4.913243174087256e-05
+      "stability": 4.913243174087256e-5
     },
     "calibrationBins": 10,
     "testClipCount": 4047,
@@ -57,18 +50,8 @@
   "modelCard": "Voiceprint voice-impression model (voice-4dim-vctk-101-v1, 1.0.0). Predicts four [0,1] tendency dimensions for a 20-second mono waveform: impression, brightness, softness, stability. Trained speaker-disjoint on 101 VCTK-RVA speakers (81/10/10 train/val/test) with brightness-decile stratification. Labels: brightness/softness/impression are consented multi-rater VCTK-RVA Elo scores (gender-normalized, rescaled to [0,1]); stability is a 0.5 placeholder constant pending a consented multi-rater source, so stability predictions are not interpretable. Held-out test loss (smooth_l1) 0.0278; Expected Calibration Error 0.0897 averaged across dims (impression 0.146, brightness 0.082, softness 0.130, stability ~0). ONNX export parity max absolute error 2.28e-28 (tolerance 1e-4). Inference is on-device in the browser via ONNX Runtime Web; no audio leaves the device. Not a speaker identification model; outputs are tendency scores, not identities. Do not use stability output until a consented multi-rater stability label source replaces the placeholder.",
   "modelOutputs": {
     "input": "fixed-seed random waveform (seed 20260727, 20s @ 16kHz mono)",
-    "outputNames": [
-      "impression",
-      "brightness",
-      "softness",
-      "stability"
-    ],
-    "values": [
-      0.0,
-      1.0,
-      0.0,
-      0.496026
-    ],
+    "outputNames": ["impression", "brightness", "softness", "stability"],
+    "values": [0.0, 1.0, 0.0, 0.496026],
     "note": "Random waveform produces extreme outputs (not real speech). Proves ONNX produces 4-dim report-grade outputs. stability≈0.5 confirms placeholder behavior."
   }
 }
