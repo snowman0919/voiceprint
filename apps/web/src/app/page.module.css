@@ -2,6 +2,7 @@
   width: min(100%, 560px);
   display: grid;
   gap: 24px;
+  margin: clamp(28px, 8vw, 96px) auto;
   padding: clamp(28px, 6vw, 48px);
   border: 1px solid #dfe6ef;
   border-radius: 28px;

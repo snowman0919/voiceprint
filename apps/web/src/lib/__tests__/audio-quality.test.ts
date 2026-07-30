@@ -14,14 +14,14 @@ describe("inspectAudio", () => {
     const pcm = new Float32Array(48_000 * 4).fill(0.1);
     const quality = inspectAudio(pcm, 48_000);
 
-    expect(quality.issues).toContain("유효 음성이 8초보다 짧습니다.");
+    expect(quality.issues).toContain("유효 음성이 30초보다 짧습니다. 표준 문장을 끝까지 읽은 뒤 다시 측정하세요.");
   });
 
-  it("accepts an 8-second capture despite floating-point duration precision", () => {
-    const pcm = new Float32Array(44_100 * 8).fill(0.1);
+  it("accepts a 30-second capture despite floating-point duration precision", () => {
+    const pcm = new Float32Array(44_100 * 30).fill(0.1);
     const quality = inspectAudio(pcm, 44_100);
 
-    expect(quality.issues).not.toContain("유효 음성이 8초보다 짧습니다.");
+    expect(quality.issues).not.toContain("유효 음성이 30초보다 짧습니다. 표준 문장을 끝까지 읽은 뒤 다시 측정하세요.");
   });
 
   it("uses 20ms frames at the browser sample rate when estimating noise", () => {

@@ -8,6 +8,7 @@ import { createLocalAnalysis, scalarCsv, type LocalAnalysis, type PracticeGoal }
 import { brand } from "@/lib/brand";
 import { maximumRangeSeconds, minimumRangeSeconds, normalizeRange } from "@/lib/audio-range";
 import { encodeSharedResult } from "@/lib/share";
+import { minimumRecordingSeconds, readingScripts } from "@/lib/reading-scripts";
 import { F0Contour } from "./f0-contour";
 import { Spectrogram } from "./spectrogram";
 
@@ -49,6 +50,7 @@ export function Recorder() {
   const [analysis, setAnalysis] = useState<LocalAnalysis>();
   const [shareUrl, setShareUrl] = useState<string>();
   const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>("clarity");
+  const [selectedScript, setSelectedScript] = useState(readingScripts[0].id);
   const recorder = useRef<MediaRecorder | undefined>(undefined);
   const stream = useRef<MediaStream | undefined>(undefined);
   const context = useRef<AudioContext | undefined>(undefined);
@@ -261,6 +263,7 @@ export function Recorder() {
   }
 
   function stopRecording() {
+    if (elapsed < minimumRecordingSeconds) return;
     recorder.current?.stop();
   }
 
@@ -333,20 +336,39 @@ export function Recorder() {
   }
 
   const canAnalyze = state === "ready" && quality?.issues.length === 0;
+  const script = readingScripts.find((item) => item.id === selectedScript) ?? readingScripts[0];
   return (
     <section className="recorder" aria-labelledby="recording-heading">
       <div>
-        <p className="eyebrow">입력</p>
-        <h2 id="recording-heading">목소리를 준비하세요</h2>
+        <p className="eyebrow">표준 측정 문장</p>
+        <h2 id="recording-heading">한 문장을 편하게 읽어 주세요</h2>
       </div>
-      <p className="prompt">권장 15~30초. 편안한 음역에서 자연스럽게 말해 보세요.</p>
+      <p className="prompt">모음과 자음, 받침을 고르게 담은 문장입니다. 최소 30초 동안 평소 속도로 읽어 주세요.</p>
+      <div className="script-picker" role="radiogroup" aria-label="표준 측정 문장 선택">
+        {readingScripts.map((item) => (
+          <button
+            aria-checked={item.id === selectedScript}
+            className={item.id === selectedScript ? "script-choice selected" : "script-choice"}
+            key={item.id}
+            onClick={() => setSelectedScript(item.id)}
+            role="radio"
+            type="button"
+          >
+            {item.title}
+          </button>
+        ))}
+      </div>
+      <blockquote className="reading-script">{script.text}</blockquote>
+      <p className="script-note">권장 읽기 시간 약 {script.targetSeconds}초 · 녹음은 30초부터 완료할 수 있습니다.</p>
       <div className="meter" aria-label={`입력 음량 ${Math.round(level * 100)}%`}>
         <span style={{ transform: `scaleX(${level})` }} />
       </div>
       <p className="time">{state === "recording" ? formatSeconds(elapsed) : "0:00"} / 1:00</p>
       {state === "recording" ? (
-        <button onClick={stopRecording} type="button">
-          녹음 중지
+        <button disabled={elapsed < minimumRecordingSeconds} onClick={stopRecording} type="button">
+          {elapsed < minimumRecordingSeconds
+            ? `${Math.ceil(minimumRecordingSeconds - elapsed)}초 더 읽기`
+            : "녹음 중지"}
         </button>
       ) : (
         <button onClick={() => void startRecording()} type="button">
@@ -412,75 +434,73 @@ export function Recorder() {
         </p>
       )}
       {quality && input && (
-        <dl className="quality">
-          <div>
-            <dt>길이</dt>
-            <dd>{input.durationSeconds.toFixed(1)}초</dd>
-          </div>
-          <div>
-            <dt>입력 음량</dt>
-            <dd>{Math.round(quality.rms * 100)}%</dd>
-          </div>
-          <div>
-            <dt>clipping</dt>
-            <dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd>
-          </div>
-          <div>
-            <dt>유성음</dt>
-            <dd>{Math.round(quality.voicedRatio * 100)}%</dd>
-          </div>
-          <div>
-            <dt>휴지 비율</dt>
-            <dd>{Math.round(quality.pauseRatio * 100)}%</dd>
-          </div>
-          <div>
-            <dt>음량 변화</dt>
-            <dd>{Math.round(quality.volumeVariation * 100)}%</dd>
-          </div>
-          {quality.estimatedSnrDb !== undefined && (
+        <details className="analysis-details">
+          <summary>입력 측정값 자세히 보기</summary>
+          <dl className="quality">
             <div>
-              <dt>추정 SNR</dt>
-              <dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd>
+              <dt>길이</dt>
+              <dd>{input.durationSeconds.toFixed(1)}초</dd>
             </div>
-          )}
-          {dsp?.f0MedianHz !== undefined && (
             <div>
-              <dt>F0 중앙값</dt>
-              <dd>{Math.round(dsp.f0MedianHz)}Hz</dd>
+              <dt>입력 음량</dt>
+              <dd>{Math.round(quality.rms * 100)}%</dd>
             </div>
-          )}
-          {dsp?.spectralCentroidHz !== undefined && (
             <div>
-              <dt>스펙트럼 중심</dt>
-              <dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd>
+              <dt>clipping</dt>
+              <dd>{(quality.clippingRatio * 100).toFixed(2)}%</dd>
             </div>
-          )}
-          {dsp?.hnrDb !== undefined && (
             <div>
-              <dt>HNR</dt>
-              <dd>{dsp.hnrDb.toFixed(1)}dB</dd>
+              <dt>유성음</dt>
+              <dd>{Math.round(quality.voicedRatio * 100)}%</dd>
             </div>
-          )}
-        </dl>
+            <div>
+              <dt>휴지 비율</dt>
+              <dd>{Math.round(quality.pauseRatio * 100)}%</dd>
+            </div>
+            <div>
+              <dt>음량 변화</dt>
+              <dd>{Math.round(quality.volumeVariation * 100)}%</dd>
+            </div>
+            {quality.estimatedSnrDb !== undefined && (
+              <div>
+                <dt>추정 SNR</dt>
+                <dd>{quality.estimatedSnrDb.toFixed(1)}dB</dd>
+              </div>
+            )}
+            {dsp?.f0MedianHz !== undefined && (
+              <div>
+                <dt>F0 중앙값</dt>
+                <dd>{Math.round(dsp.f0MedianHz)}Hz</dd>
+              </div>
+            )}
+            {dsp?.spectralCentroidHz !== undefined && (
+              <div>
+                <dt>스펙트럼 중심</dt>
+                <dd>{Math.round(dsp.spectralCentroidHz)}Hz</dd>
+              </div>
+            )}
+            {dsp?.hnrDb !== undefined && (
+              <div>
+                <dt>HNR</dt>
+                <dd>{dsp.hnrDb.toFixed(1)}dB</dd>
+              </div>
+            )}
+          </dl>
+        </details>
       )}
-      {waveform && (
-        <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">
-          {waveform.map((peak, index) => (
-            <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />
-          ))}
-        </svg>
-      )}
-      {dsp?.spectrogram && (
-        <section aria-labelledby="spectrogram-heading">
-          <h3 id="spectrogram-heading">스펙트로그램</h3>
-          <Spectrogram data={dsp.spectrogram} />
-        </section>
-      )}
-      {dsp?.f0ContourHz && (
-        <section aria-labelledby="f0-contour-heading">
-          <h3 id="f0-contour-heading">F0 궤적</h3>
-          <F0Contour values={dsp.f0ContourHz} />
-        </section>
+      {(waveform || dsp?.spectrogram || dsp?.f0ContourHz) && (
+        <details className="analysis-details">
+          <summary>파형과 주파수 보기</summary>
+          {waveform && (
+            <svg aria-label="입력 파형" className="waveform" viewBox="0 0 120 100" role="img">
+              {waveform.map((peak, index) => (
+                <line key={index} x1={index + 0.5} x2={index + 0.5} y1={50 - peak * 45} y2={50 + peak * 45} />
+              ))}
+            </svg>
+          )}
+          {dsp?.spectrogram && <Spectrogram data={dsp.spectrogram} />}
+          {dsp?.f0ContourHz && <F0Contour values={dsp.f0ContourHz} />}
+        </details>
       )}
       <label className="goal">
         연습 목표

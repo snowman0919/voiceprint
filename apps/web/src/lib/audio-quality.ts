@@ -65,7 +65,7 @@ export function inspectAudio(pcm: Float32Array, sampleRate: number, droppedFrame
         ) / frameMean
       : 0;
   const issues: string[] = [];
-  if (durationSeconds < 7.99) issues.push("유효 음성이 8초보다 짧습니다.");
+  if (durationSeconds < 30) issues.push("유효 음성이 30초보다 짧습니다. 표준 문장을 끝까지 읽은 뒤 다시 측정하세요.");
   if (durationSeconds > 60) issues.push("60초를 초과한 파일은 구간을 선택한 뒤 다시 시도하세요.");
   if (rms < 0.01) issues.push("입력 음량이 너무 작습니다.");
   if (clippingRatio > 0.01) issues.push("clipping이 큽니다.");

@@ -1,4 +1,4 @@
-export const minimumRangeSeconds = 8;
+export const minimumRangeSeconds = 30;
 export const maximumRangeSeconds = 60;
 
 export function normalizeRange(duration: number, start: number, length: number) {
